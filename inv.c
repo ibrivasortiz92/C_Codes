@@ -8,8 +8,8 @@
 // PROTOTYPES
 void print(int M, long double Matrix[]);
 void mult(int M, long double Matrix[], long double X[], long double **B);
-void backsub(int M, long double Matrix[], long double **X, long double B[]);
-int gelim(int M, long double Matrix[], long double **X, long double B[]);
+void matrix_mult(int M, long double Matrix1[], long double Matrix2[], long double **R);
+int inv(int M, long double Matrix[], long double **X);
 
 
 int main(){
@@ -25,22 +25,20 @@ int main(){
   //                         9, 10, 11, 12,
   //                         13, 14, 15, 16};
   long double B[] = {1, 1, 1, 1};
-  long double *X = NULL;
-  long double *IND = NULL;
+  long double *X = NULL, *IND = NULL, *R = NULL;
 
   // BODY
-  if (gelim(M, Matrix, &X, B) == 1){
-    mult(M, Matrix, X, &IND);
+  if (inv(M, Matrix, &X)) {
+    printf("INVERSE MATRIX:\n");
+    print(M, X);
 
-    printf("SOLUTION:\n");
-    for (int i = 0; i < M; i++){
-      printf("%.5Lf\n", X[i]);
-    }
-    printf("\n");
+    printf("VERIFICATION:\n");
+    matrix_mult(M, Matrix, X, &R);
+    print(M, R);
   }
-
+  
   // FREE MEMORY
-  free(X); free(IND);
+  free(X); free(IND); free(R);
 
   return 0;
 }
@@ -63,8 +61,6 @@ void print(int M, long double Matrix[]){
 
 void mult(int M, long double Matrix[], long double X[], long double **B){
 
-  printf("VERIFICATION:\n");
-
   *B = malloc(sizeof(long double) * M); assert(*B != NULL);
   long double sum;
 
@@ -74,47 +70,46 @@ void mult(int M, long double Matrix[], long double X[], long double **B){
       sum = sum + Matrix[M * j + i] * X[i];
     }
     (*B)[j] = sum;
-    printf("%.5Lf\n", (*B)[j]);
   }
-  printf("\n");
 
 }
 
 
-void backsub(int M, long double Matrix[], long double **X, long double B[]){
+void matrix_mult(int M, long double Matrix1[], long double Matrix2[], long double **R){
 
-  *X = malloc(sizeof(long double) * M); assert(*X != NULL);
-
+  *R = malloc(sizeof(long double) * M * M); assert(*R != NULL);
   long double sum;
 
-  (*X)[M - 1] = B[M -1] / Matrix[M * M - 1];
-  for (int k = M - 2; k >= 0; k--){
-    sum = 0;
-    for (int i = k; i < M - 1; i++){
-      sum = sum + Matrix[M * k + i + 1] * (*X)[i + 1];
+  for (int k = 0; k < M; k++) {
+    for (int j = 0; j < M; j++){
+      sum = 0;
+      for (int i = 0; i < M; i++){
+        sum = sum + Matrix1[M * j + i] * Matrix2[M * i + k];
+      }
+      (*R)[M * j + k] = sum;
     }
-    (*X)[k] = (B[k] - sum) / Matrix[M * (k) + k];
   }
 
 }
 
 
-int gelim(int M, long double Matrix[], long double **X, long double B[]){
+int inv(int M, long double Matrix[], long double **X){
 
   int p;
   long double val, m;
 
-  long double tval, *temp = NULL;
+  long double *temp = NULL;
   temp = malloc(sizeof(long double) * M); assert(temp != NULL);
 
-  long double *B2 = NULL, *Matrix2 = NULL;
-  B2 = malloc(sizeof(long double) * M); assert(B2 != NULL);
+  long double *IDEN = NULL, *Matrix2 = NULL;
+  IDEN = malloc(sizeof(long double) * M * M); assert(IDEN != NULL);
   Matrix2 = malloc(sizeof(long double) * M * M); assert(Matrix2 != NULL);
   for (int j = 0; j < M; j++){
     for (int i = 0; i < M; i++){
       Matrix2[M * j + i] = Matrix[M * j + i];
+      if (i == j) IDEN[M * j + i] = 1.0;
+      else IDEN[M * j + i] = 0.0;
     }
-    B2[j] = B[j];
   }
 
   for (int j = 0; j < M; j++){
@@ -132,29 +127,44 @@ int gelim(int M, long double Matrix[], long double **X, long double B[]){
       temp[i] = Matrix2[M * p + i];
       Matrix2[M * p + i] = Matrix2[M * j + i];
       Matrix2[M * j + i] = temp[i];
+
+      temp[i] = IDEN[M * p + i];
+      IDEN[M * p + i] = IDEN[M * j + i];
+      IDEN[M * j + i] = temp[i];
     }
-    tval = B2[p]; B2[p] = B2[j]; B2[j] = tval;
 
     if (fabs(Matrix2[M * j + j]) <= eps){
       printf("Singular Matrix\n\n");
-      free(temp); free(B2); free(Matrix2);
+      free(temp); free(IDEN); free(Matrix2);
       return 0;
     }
 
-    // TRIANGULIZATION
+    // GAUSS ELIMINATION
     for (int jj = j + 1; jj < M; jj++){
       m = Matrix2[M * jj + j] / Matrix2[M * j + j];
-      for(int i = j; i < M; i++){
+      for(int i = 0; i < M; i++){
         Matrix2[M * jj + i] = Matrix2[M * jj + i] - m * Matrix2[M * j + i];
+        IDEN[M * jj + i] = IDEN[M * jj + i] - m * IDEN[M * j + i];
       }
-      B2[jj] = B2[jj] - m * B2[j];
     }
   }
 
   // BACK SUBSTITUTION
-  backsub(M, Matrix2, &(*X), B2);
-
-  free(temp); free(B2); free(Matrix2);
+  *X = malloc(sizeof(long double) * M * M); assert(*X != NULL);
+  long double sum;
+  for (int k = 0; k < M; k++){
+    (*X)[M * (M - 1) + k] = IDEN[M * (M - 1) + k] / Matrix2[M * M - 1];
+    for (int j = M - 2; j >= 0; j--){
+      sum = 0;
+      for (int i = j; i < M - 1; i++){
+        sum = sum + Matrix2[M * j + i + 1] * (*X)[M * (i + 1) + k];
+      }
+      (*X)[M * j + k] = (IDEN[M * j + k] - sum) / Matrix2[M * j + j];
+      if (fabs((*X)[M * j + k]) < eps) (*X)[M * j + k] = 0.0;
+    }
+  }
+  
+  free(temp); free(IDEN); free(Matrix2);
 
   return 1;
 }
