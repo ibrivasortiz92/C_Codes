@@ -27,7 +27,7 @@ long double* equal(int M, long double Matrix[], long double **OUTPUT);
 long double* neg(int M, long double Matrix[], long double **OUTPUT);
 
 //////////////////////////////////////////////////////////////////// MATRIX SUM
-long double* sum(int M, long double Matrix1[], long double Matrix2[], long double **OUTPUT);
+long double* matrix_sum(int M, long double Matrix1[], long double Matrix2[], long double **OUTPUT);
 
 /////////////////////////////////////////////////////// MATRIX MULTIPLICATION 1
 long double* matrix_mult1(int M, long double Matrix[], long double X[], long double **OUTPUT);
@@ -59,7 +59,7 @@ int main(){
   long double *OP1 = NULL, *OP2 = NULL;
   OP1 = equal(M, R, &OP1);
   OP2 = equal(M, R, &OP2);
-  RESULT = sum(M, OP1, OP2, &RESULT);
+  RESULT = matrix_sum(M, OP1, OP2, &RESULT);
   print_matrix(M, RESULT);
 
   // MATRIX MULTIPLICATION 1
@@ -187,8 +187,23 @@ long double* neg(int M, long double Matrix[], long double **OUTPUT){
 
 }
 
+//////////////////////////////////////////////////////////////////// VECTOR SUM
+long double* vector_sum(int M, long double Vector1[], long double Vector2[], long double **OUTPUT){
+
+  if ((*OUTPUT) == NULL){
+    *OUTPUT = malloc(sizeof(long double) * M); assert(*OUTPUT != NULL);
+  }
+
+  for (int i = 0; i < M; i++){
+    (*OUTPUT)[i] = Vector1[i] + Vector2[i];
+  }
+
+  return *OUTPUT;
+
+}
+
 //////////////////////////////////////////////////////////////////// MATRIX SUM
-long double* sum(int M, long double Matrix1[], long double Matrix2[], long double **OUTPUT){
+long double* matrix_sum(int M, long double Matrix1[], long double Matrix2[], long double **OUTPUT){
 
   if ((*OUTPUT) == NULL){
     *OUTPUT = malloc(sizeof(long double) * M * M); assert(*OUTPUT != NULL);
