@@ -41,7 +41,9 @@ long double* eye(int M, long double **OUTPUT);
 
 long double* equal(int M, long double Matrix[], long double **OUTPUT);
 
-long double* neg(int M, long double Matrix[], long double **OUTPUT);
+long double* vector_neg(int M, long double VECTOR[], long double **OUTPUT);
+
+long double* matrix_neg(int M, long double Matrix[], long double **OUTPUT);
 
 long double* matrix_sum(int M, long double Matrix1[], long double Matrix2[], long double **OUTPUT);
 
@@ -69,7 +71,7 @@ long double* get_FM1(int M, int nyr, int nxr, int ry, int rx, long double FM1[],
 long double* get_SM(int M, int nyr, int nxr, int ry, int rx, long double SM[], long double **OUTPUT);
 
 //////////////////////////////////////////////////////// RM_CN ITERATIVE SCHEME
-int rm_cn (int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol, long double RM[], long double PV[], long double FM0[], long double FM1[], long double SM[], long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW);
+int rm_cn (int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol, long double W[], long double RM[], long double PV[], long double FM0[], long double FM1[], long double SM[], long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -174,7 +176,7 @@ int main(int argc, char *argv[]){
   long double *YFLOW = NULL; // Angular flux at the x edges
 
   // ITERATIVE SCHEME
-  if (rm_cn (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW) != 0){
+  if (rm_cn (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, W, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW) != 0){
     status = 5;
   };
 
@@ -426,18 +428,20 @@ int input_by_txt(int *N,                  // Quadrature order
 	}
 
   // TOLERANCE
-	if (fscanf(cfPtr, "%lf", tol) == 0) {
+  double dtol;
+	if (fscanf(cfPtr, "%lf", &dtol) == 0) {
 		// Error reading input file
 		free(*ZON); free(*XDOM); free(*YDOM);
 		free(*ZMAP); free(*QMAP);
     return 2;
 	}
-	if (*tol <= 0.0 || *tol >= 1.0){
+	if (dtol <= 0.0 || dtol >= 1.0){
 		free(*ZON); free(*XDOM); free(*YDOM);
 		free(*ZMAP); free(*QMAP);
 		// The tolerance (TOL) must be a small number between 0.0 and 1.0
 		return 2;
 	}
+  *tol = (long double)dtol;
 
 	fclose(cfPtr);
 
@@ -1121,7 +1125,23 @@ long double* equal(int M, long double Matrix[], long double **OUTPUT){
 }
 
 
-long double* neg(int M, long double Matrix[], long double **OUTPUT){
+long double* vector_neg(int M, long double VECTOR[], long double **OUTPUT){
+
+  if ((*OUTPUT) == NULL){
+    *OUTPUT = malloc(sizeof(long double) * M); assert(*OUTPUT != NULL);
+  }
+
+  for (int i = 0; i < M; i++){
+    if (fabs(VECTOR[i]) < eps) (*OUTPUT)[i] = 0.0;
+    else (*OUTPUT)[i] = - VECTOR[i];
+  }
+
+  return *OUTPUT;
+
+}
+
+
+long double* matrix_neg(int M, long double Matrix[], long double **OUTPUT){
 
   if ((*OUTPUT) == NULL){
     *OUTPUT = malloc(sizeof(long double) * M * M); assert(*OUTPUT != NULL);
@@ -1536,15 +1556,15 @@ int response_matrix(int N,               // Quadrature order
 
       TEMP0 = matrix_mult2(M, XE_INV, XB, &TEMP0);
       TEMP1 = matrix_mult2(M, XA, TEMP0, &TEMP1);
-      TEMP0 = neg(M, TEMP1, &TEMP0);
+      TEMP0 = matrix_neg(M, TEMP1, &TEMP0);
       TEMP1 = matrix_sum(M, XB, TEMP0, &TEMP1);
-      M2 = neg(M, TEMP1, &M2);
+      M2 = matrix_neg(M, TEMP1, &M2);
       
       TEMP0 = matrix_mult2(M, YE_INV, YB, &TEMP0);
       TEMP1 = matrix_mult2(M, YA, TEMP0, &TEMP1);
-      TEMP0 = neg(M, TEMP1, &TEMP0);
+      TEMP0 = matrix_neg(M, TEMP1, &TEMP0);
       TEMP1 = matrix_sum(M, YB, TEMP0, &TEMP1);
-      M3 = neg(M, TEMP1, &M3);
+      M3 = matrix_neg(M, TEMP1, &M3);
 
       M4 = eye(M, &M4);
 
@@ -1580,7 +1600,7 @@ int response_matrix(int N,               // Quadrature order
       long double *AUX3 = NULL, *S0 = NULL, *S1 = NULL;
 
       TEMP0 = matrix_mult2(M, XA, XE_INV, &TEMP0);
-      TEMP1 = neg(M, TEMP0, &TEMP1);
+      TEMP1 = matrix_neg(M, TEMP0, &TEMP1);
       TEMP0 = eye(M, &TEMP0);
       M1 = matrix_sum(M, TEMP0, TEMP1, &M1);
 
@@ -1589,7 +1609,7 @@ int response_matrix(int N,               // Quadrature order
       M3 = zeros(M, &M3);
 
       TEMP0 = matrix_mult2(M, YA, YE_INV, &TEMP0);
-      TEMP1 = neg(M, TEMP0, &TEMP1);
+      TEMP1 = matrix_neg(M, TEMP0, &TEMP1);
       TEMP0 = eye(M, &TEMP0);
       M4 = matrix_sum(M, TEMP0, TEMP1, &M4);
 
@@ -1725,6 +1745,7 @@ int rm_cn (int N,               // Quadrature order
            long double QMAP[],  // External source map
            long double BC[],    // Boundary conditions
            long double tol,     // Tolerance
+           long double W[],     // Quadrature weight
            long double RM[],    // Response matrix
            long double PV[],    // Source vector
            long double FM0[],   // Average flux matrix 0
@@ -1784,22 +1805,397 @@ int rm_cn (int N,               // Quadrature order
 		}
 	}
 
-  // ITERATIVE PROCESS
+  // VARIABLES
   clock_t start, end;
   long double cpu_time;
-  printf("\nRM_CN ITERATIVE PROCESS:\n\n");
-	printf("ITER\tMAX_ERR (MFLUX)\n");
   long double ERR = 1.0;
   int ITER = -1;
+  int j_b, j_f, i_b, i_f;
+  int nc_y, nc_x;
+  long double *IN = NULL, *OUT = NULL; 
+  long double *RESP_MATRIX = NULL, *PART_VECTOR = NULL, *V_AUX = NULL;
+  IN = malloc(sizeof(long double) * 2 * M); assert(IN != NULL);
+  OUT = malloc(sizeof(long double) * 2 * M); assert(OUT != NULL);
+  RESP_MATRIX = malloc(sizeof(long double) * 4 * M * M); assert(RESP_MATRIX != NULL);
+  PART_VECTOR = malloc(sizeof(long double) * 2 * M); assert(PART_VECTOR != NULL);
+  V_AUX = malloc(sizeof(long double) * 2 * M); assert(V_AUX != NULL);
+  long double *X_VECTOR = NULL, *Y_VECTOR = NULL, *M_VECTOR = NULL, *V_AUX2 = NULL;
+  long double *FM_0 = NULL, *FM_1 = NULL, *S_VECTOR = NULL;
+  X_VECTOR = malloc(sizeof(long double) * M); assert(X_VECTOR != NULL);
+  Y_VECTOR = malloc(sizeof(long double) * M); assert(Y_VECTOR != NULL);
+  M_VECTOR = malloc(sizeof(long double) * M); assert(M_VECTOR != NULL);
+  V_AUX2 = malloc(sizeof(long double) * M); assert(V_AUX2 != NULL);
+  FM_0 = malloc(sizeof(long double) * M * M); assert(FM_0 != NULL);
+  FM_1 = malloc(sizeof(long double) * M * M); assert(FM_1 != NULL);
+  S_VECTOR = malloc(sizeof(long double) * M); assert(S_VECTOR != NULL);
+  long double m_sum, w, flux0, flux;
+
+  // ITERATIVE PROCESS
+  printf("\nRM_CN ITERATIVE PROCESS:\n\n");
+	printf("ITER\tMAX_ERR (MFLUX)\n");
   start = clock();
-  while (ERR > tol || ITER < 10000){
-    ERR = 1.0; ITER = ITER + 1;
+  while (ERR > tol && ITER < 10000){
+    ERR = 0.0; ITER = ITER + 1;
 
+    // 1. SW - > NE SWEEP
+    j_b = 0; j_f = j_b + 1;
+    for (int ry = 0; ry < nyr; ry++) {
+      nc_y = (int)YDOM[2 * ry + 1]; 
+      for (int j = 0; j < nc_y; j++) {
+        i_b = 0; i_f = i_b + 1;
+        for (int rx = 0; rx < nxr; rx++) {
+          RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
+          PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
+          nc_x = (int)XDOM[2 * rx + 1];
+          for (int i = 0; i < nc_x; i++) {
 
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+            }
+
+            V_AUX = matrix_mult1(2*M, RESP_MATRIX, IN, &V_AUX);
+            OUT = vector_sum(2*M, V_AUX, PART_VECTOR, &OUT);
+
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+              }
+            }
+
+            i_b = i_b + 1; i_f = i_b + 1;
+
+          }
+        }
+        j_b = j_b + 1; j_f = j_b + 1;
+      }
+    }
+
+    // 2. SE - > NW SWEEP
+    j_b = 0; j_f = j_b + 1;
+    for (int ry = 0; ry < nyr; ry++) {
+      nc_y = (int)YDOM[2 * ry + 1]; 
+      for (int j = 0; j < nc_y; j++) {
+        i_b = ntc_x - 1; i_f = i_b + 1;
+        for (int rx = nxr-1; rx >= 0; rx--) {
+          RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
+          PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
+          nc_x = (int)XDOM[2 * rx + 1];
+          for (int i = 0; i < nc_x; i++) {
+
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+            }
+
+            V_AUX = matrix_mult1(2*M, RESP_MATRIX, IN, &V_AUX);
+            OUT = vector_sum(2*M, V_AUX, PART_VECTOR, &OUT);
+
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+              }
+            }
+
+            i_b = i_b - 1; i_f = i_b + 1;
+
+          }
+        }
+        j_b = j_b + 1; j_f = j_b + 1;
+      }
+    }
+
+    // 3. NE - > SW SWEEP
+    j_b = ntc_y - 1; j_f = j_b + 1;
+    for (int ry = nyr - 1; ry >= 0; ry--) {
+      nc_y = (int)YDOM[2 * ry + 1]; 
+      for (int j = 0; j < nc_y; j++) {
+        i_b = ntc_x - 1; i_f = i_b + 1;
+        for (int rx = nxr - 1; rx >= 0; rx--) {
+          RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
+          PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
+          nc_x = (int)XDOM[2 * rx + 1];
+          for (int i = 0; i < nc_x; i++) {
+
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+            }
+
+            V_AUX = matrix_mult1(2*M, RESP_MATRIX, IN, &V_AUX);
+            OUT = vector_sum(2*M, V_AUX, PART_VECTOR, &OUT);
+
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+              }
+            }
+
+            i_b = i_b - 1; i_f = i_b + 1;
+
+          }
+        }
+        j_b = j_b - 1; j_f = j_b + 1;
+      }
+    }
+
+    // 4. NW - > SE SWEEP
+    j_b = ntc_y - 1; j_f = j_b + 1;
+    for (int ry = nyr - 1; ry >= 0; ry--) {
+      nc_y = (int)YDOM[2 * ry + 1]; 
+      for (int j = 0; j < nc_y; j++) {
+        i_b = 0; i_f = i_b + 1;
+        for (int rx = 0; rx < 0; rx++) {
+          RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
+          PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
+          nc_x = (int)XDOM[2 * rx + 1];
+          for (int i = 0; i < nc_x; i++) {
+
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+            }
+
+            V_AUX = matrix_mult1(2*M, RESP_MATRIX, IN, &V_AUX);
+            OUT = vector_sum(2*M, V_AUX, PART_VECTOR, &OUT);
+
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+              }
+            }
+
+            i_b = i_b + 1; i_f = i_b + 1;
+
+          }
+        }
+        j_b = j_b - 1; j_f = j_b + 1;
+      }
+    }
+
+    // REFLECTIVE BOUNDARY CONDITIONS
+		j_b = 0;
+		for (int ry = 0; ry < nyr; ry++) {
+			nc_y = (int)YDOM[2 * ry + 1];
+			for (int j = 0; j < nc_y; j++) {
+				for (int m = 0; m < M/4; m++) {
+					if (BC[0] == -1.0) {
+						(*XFLOW)[M * ((ntc_x + 1) * j_b + 0) + m] = (*XFLOW)[M * ((ntc_x + 1) * j_b + 0) + M/4 + m];
+						(*XFLOW)[M * ((ntc_x + 1) * j_b + 0) + 3*M/4 + m] = (*XFLOW)[M * ((ntc_x + 1) * j_b + 0) + M/2 + m];
+					}
+					if (BC[2] == -1.0) {
+						(*XFLOW)[M * ((ntc_x + 1) * j_b + ntc_x) + M/4 + m] = (*XFLOW)[M * ((ntc_x + 1) * j_b + ntc_x) + m];
+						(*XFLOW)[M * ((ntc_x + 1) * j_b + ntc_x) + M/2 + m] = (*XFLOW)[M * ((ntc_x + 1) * j_b + ntc_x) + 3*M/4 + m];
+					}
+				}
+				j_b = j_b + 1;
+			}
+		}
+		i_b = 0;
+		for (int rx = 0; rx < nxr; rx++) {
+			nc_x = (int)XDOM[2 * rx + 1];
+			for (int i = 0; i < nc_x; i++) {
+				for (int m = 0; m < M / 4; m++) {
+					if (BC[1] == -1.0) {
+						(*YFLOW)[M * (ntc_x * 0 + i_b) + m] = (*YFLOW)[M * (ntc_x * 0 + i_b) + 3*M/4 + m];
+						(*YFLOW)[M * (ntc_x * 0 + i_b) + M/4 + m] = (*YFLOW)[M * (ntc_x * 0 + i_b) + M/2 + m];
+					}
+					if (BC[3] == -1.0) {
+						(*YFLOW)[M * (ntc_x * ntc_y + i_b) + 3*M/4 + m] = (*YFLOW)[M * (ntc_x * ntc_y + i_b) + m];
+						(*YFLOW)[M * (ntc_x * ntc_y + i_b) + M/2 + m] = (*YFLOW)[M * (ntc_x * ntc_y + i_b) + M/4 + m];
+					}
+				}
+				i_b = i_b + 1;
+			}
+		}
+
+    // SCALAR FLUX, SOURCE TERM AND STOP CRITERIA
+    i_b = 0; i_f = i_b + 1;
+    for (int rx = 0; rx < nxr; rx++){
+      nc_x = (int)XDOM[2 * rx + 1];
+			for (int i = 0; i < nc_x; i++) {
+        j_b = 0; j_f = j_b + 1;
+        for (int ry = 0; ry < nyr; ry++){
+          nc_y = (int)YDOM[2 * ry + 1];
+          FM_0 = get_FM0(M, nyr, nxr, ry, rx, FM0, &FM_0);
+          FM_1 = get_FM1(M, nyr, nxr, ry, rx, FM1, &FM_1);
+          S_VECTOR = get_SM(M, nyr, nxr, ry, rx, SM, &S_VECTOR);
+          for (int j = 0; j < nc_x; j++){
+
+            for (int m = 0; m < M; m++){
+              if (m < M / 4){
+                X_VECTOR[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m]
+                              - (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                Y_VECTOR[m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m]
+                              - (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 4 && m < M / 2){
+                X_VECTOR[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m]
+                              - (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                Y_VECTOR[m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m]
+                              - (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+              }
+              else if (m >= M / 2 && m < 3 * M / 4){
+                X_VECTOR[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m]
+                              - (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
+                Y_VECTOR[m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m]
+                              - (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+              else if (m >= 3 * M / 4 && m < M){
+                X_VECTOR[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m]
+                              - (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
+                Y_VECTOR[m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m]
+                              - (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+              }
+            }
+
+            V_AUX2 = matrix_mult1(M, FM_0, X_VECTOR, &V_AUX2);
+            X_VECTOR = matrix_mult1(M, FM_1, Y_VECTOR, &X_VECTOR);
+            Y_VECTOR = vector_sum(M, V_AUX2, X_VECTOR, &Y_VECTOR);
+            V_AUX2 = vector_neg(M, Y_VECTOR, &V_AUX2);
+            M_VECTOR = vector_sum(M, V_AUX2, S_VECTOR, &M_VECTOR);
+
+            //print_vector(M, M_VECTOR);
+
+            m_sum = 0;
+            for (int m = 0; m < M; m++){
+              w = W[m];
+              (*MFLOW)[M * (ntc_x * j_b + i_b) + m] = M_VECTOR[m];
+              m_sum = m_sum + M_VECTOR[m] * w;
+            }
+            flux = 0.25 * m_sum;
+
+            flux0 = (*MFLUX)[ntc_x * j_b + i_b];
+            (*MFLUX)[ntc_x * j_b + i_b] = flux;
+
+            if (fabs(1 - flux0 / flux) > ERR) ERR = fabs(1 - flux0 / flux);
+
+            j_b = j_b + 1; j_f = j_b + 1;
+          }
+        }
+
+        i_b = i_b + 1; i_f = i_b + 1;
+      }
+    }
+
+    printf("%d\t%.5Le\n", ITER, ERR);
   }
   end = clock();
   cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
   printf("CPU TIME = %.5Le\n\n", cpu_time);
+
+  free(IN); free(OUT); 
+  free(RESP_MATRIX); free(PART_VECTOR); free(V_AUX);
+  free(X_VECTOR); free(Y_VECTOR); free(M_VECTOR); free(V_AUX2);
+  free(FM_0); free(FM_1); free(S_VECTOR);
 
   return 0;
 
