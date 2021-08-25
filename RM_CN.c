@@ -2,19 +2,20 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <time.h>
 #define printf __mingw_printf
 #define eps 1e-12
 
 //////////////////////////////////////////////////////////////////////////////////// PROTOTYPES
 
 ///////////////////////////////////////////////////////// FREE MEMORY REQUESTED
-void free_memory(long double **ZON, int **XDOM, int **YDOM, int **ZMAP, long double **QMAP, long double **MIU, long double **THETA, long double **FI, long double **W, long double **LIST, long double **XVALS, long double **XVECTS, long double **YVALS, long double **YVECTS, long double **RM, long double **PV); //double **MFLUX, double **MFLOW, double **XFLOW, double **YFLOW);
+void free_memory(int status, long double **ZON, long double **XDOM, long double **YDOM, int **ZMAP, long double **QMAP, long double **MIU, long double **THETA, long double **FI, long double **W, long double **LIST, long double **XVALS, long double **XVECTS, long double **YVALS, long double **YVECTS, long double **RM, long double **PV, long double **FM0, long double **FM1, long double **SM, long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW);
 
 //////////////////////////////////////////////////////// LOAD PROBLEM FROM FILE
-int input_by_txt(int *N, int *nz, long double **ZON, int *nxr, int **XDOM, int *nyr, int **YDOM, int **ZMAP, long double **QMAP, long double *BC, long double *tol, const char *filename);
+int input_by_txt(int *N, int *nz, long double **ZON, int *nxr, long double **XDOM, int *nyr, long double **YDOM, int **ZMAP, long double **QMAP, long double *BC, long double *tol, const char *filename);
 
 /////////////////////////////////////////////////////////// GENERATE QUADRATURE
-void quad(int N, long double **MIU, long double **THETA, long double **CHI, long double **W, long double **LIST);
+int quad(int N, long double **MIU, long double **THETA, long double **CHI, long double **W, long double **LIST);
 
 ////////////////////////////////////////////////////////////////////// SPECTRUM
 void myXFunc(int N, long double x, long double MIU[], long double W[], long double c0, long double *y);
@@ -55,7 +56,20 @@ long double* vector_concat(int M, long double V1[], long double V2[], long doubl
 long double* matrix_concat(int M, long double Matrix1[], long double Matrix2[], long double Matrix3[], long double Matrix4[], long double **OUTPUT);
 
 ////////////////////////////////////////////////////////////// RESPONSE MATRIX
-int response_matrix(int N, int nz, long double ZON[], int nxr, int XDOM[], int nyr, int YDOM[], int ZMAP[], long double QMAP[], long double MIU[], long double THETA[], long double W[], long double XVALS[], long double XVECTS[], long double YVALS[], long double YVECTS[], long double **RM, long double **PV);
+int response_matrix(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double MIU[], long double THETA[], long double W[], long double XVALS[], long double XVECTS[], long double YVALS[], long double YVECTS[], long double **RM, long double **PV, long double **FM0, long double **FM1, long double **SM);
+
+long double* get_RM(int M, int nyr, int nxr, int ry, int rx, long double RM[], long double **OUTPUT);
+
+long double* get_PV(int M, int nyr, int nxr, int ry, int rx, long double PV[], long double **OUTPUT);
+
+long double* get_FM0(int M, int nyr, int nxr, int ry, int rx, long double FM0[], long double **OUTPUT);
+
+long double* get_FM1(int M, int nyr, int nxr, int ry, int rx, long double FM1[], long double **OUTPUT);
+
+long double* get_SM(int M, int nyr, int nxr, int ry, int rx, long double SM[], long double **OUTPUT);
+
+//////////////////////////////////////////////////////// RM_CN ITERATIVE SCHEME
+int rm_cn (int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol, long double RM[], long double PV[], long double FM0[], long double FM1[], long double SM[], long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -77,9 +91,9 @@ int main(int argc, char *argv[]){
   int nz;                    // Number of zones
   long double *ZON = NULL;   // Zone entries
   int nxr;                   // Number of regions in X
-  int *XDOM = NULL;          // X Region entries
+  long double *XDOM = NULL;          // X Region entries
   int nyr;                   // Number of regions in Y
-  int *YDOM = NULL;          // Y Region entries
+  long double *YDOM = NULL;          // Y Region entries
   int *ZMAP = NULL;          // Zone map
   long double *QMAP = NULL;  // External source map
   long double BC[4];         // Boundary conditions
@@ -90,10 +104,10 @@ int main(int argc, char *argv[]){
 
   // LOAD PROBLEM
   if (input_by_txt(&N, &nz, &ZON, &nxr, &XDOM, &nyr, &YDOM, &ZMAP, &QMAP, BC, &tol, filename) > 0){
-    status = 1;
+    status = 2;
     return 0;
   } 
-  printf("input file loaded succesfully\n");
+  //printf("input file loaded succesfully\n");
 
   // QUADRATURE VARIABLES
   long double *MIU = NULL;   // Ordinates in X
@@ -103,9 +117,15 @@ int main(int argc, char *argv[]){
   long double *LIST = NULL;  // Ordinates list
 
   // GENERATE QUADRATURE
-  quad(N, &MIU, &THETA, &FI, &W, &LIST);
-
-  int M = N * (N + 2) / 2;
+  if (quad(N, &MIU, &THETA, &FI, &W, &LIST) != 0){
+    status = 3;
+    free_memory(status, &ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
+              &MIU, &THETA, &FI, &W, &LIST,
+              NULL, NULL, NULL, NULL,
+              NULL, NULL, NULL, NULL, NULL,
+              NULL, NULL, NULL, NULL);
+    return 0;
+  };
 
   // SPECTRUM VARIABLES
   long double *XVALS = NULL;  // Eigenvalues in X
@@ -117,24 +137,55 @@ int main(int argc, char *argv[]){
   spectrum(N, MIU, THETA, LIST, W, nz, ZON, &XVALS, &XVECTS, &YVALS, &YVECTS);
 
   // PRINT SPECTRUM
-  print_spectrum(N, nz, XVALS, XVECTS, YVALS, YVECTS);
+  //print_spectrum(N, nz, XVALS, XVECTS, YVALS, YVECTS);
 
   // RESPONSE MATRIX VARIABLES
   long double *RM = NULL;  // Response matrix
   long double *PV = NULL;  // Particular vector
+  long double *FM0 = NULL; // Average flux matrix 0
+  long double *FM1 = NULL; // Avergae flux matrix 1
+  long double *SM = NULL;  // Average source vector
 
   // GENERATE RESPONSE MATRIX
-  response_matrix(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, MIU, THETA, W, XVALS, XVECTS, YVALS, YVECTS, &RM, &PV);
-  
+  if (response_matrix(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, MIU, THETA, W, XVALS, XVECTS, YVALS, YVECTS, &RM, &PV, &FM0, &FM1, &SM) != 0){
+    status = 4;
+    free_memory(status, &ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
+                &MIU, &THETA, &FI, &W, &LIST,
+                &XVALS, &XVECTS, &YVALS, &YVECTS,
+                &RM, &PV, &FM0, &FM1, &SM,
+                NULL, NULL, NULL, NULL);
+    return 0;
+  };
 
+  // PRINT RESPONSE MATRIZ
+  // int M = N * (N + 2) / 2;
+  // long double *RAUX = NULL;
+  // for (int ry = 0; ry < nyr; ry++){
+  //   for (int rx = 0; rx < nxr; rx++){
+  //     RAUX = get_RM(M, nyr,nxr,ry,rx,RM,&RAUX);
+  //     print_matrix(2*M,RAUX);
+  //   }
+  // }
+
+  // PRINCIPAL VARIABLES
+  long double *MFLUX = NULL; // Escalar flux in the nodes
+  long double *MFLOW = NULL; // Angular flux in the nodes
+  long double *XFLOW = NULL; // Angular flux at the y edges
+  long double *YFLOW = NULL; // Angular flux at the x edges
+
+  // ITERATIVE SCHEME
+  if (rm_cn (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW) != 0){
+    status = 5;
+  };
 
   // FREE MEMORY
-  free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
+  free_memory(status, &ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
               &MIU, &THETA, &FI, &W, &LIST,
               &XVALS, &XVECTS, &YVALS, &YVECTS,
-              &RM, &PV);
-              //&MFLUX, &MFLOW, &XFLOW, &YFLOW);
+              &RM, &PV, &FM0, &FM1, &SM,
+              &MFLUX, &MFLOW, &XFLOW, &YFLOW);
 
+  printf("%d\n", status);
   return 0;
 
 }
@@ -144,24 +195,29 @@ int main(int argc, char *argv[]){
 //////////////////////////////////////////////////////////////////////////////// IMPLEMENTATION
 
 ///////////////////////////////////////////////////////// FREE MEMORY REQUESTED
-void free_memory(long double **ZON, int **XDOM, int **YDOM, int **ZMAP, long double **QMAP,
-                 long double **MIU, long double **THETA, long double **FI, long double **W, long double **LIST, long double **XVALS, long double **XVECTS, long double **YVALS, long double **YVECTS, long double **RM, long double **PV){
-				         //double **MFLUX, double **MFLOW, double **XFLOW, double **YFLOW){
+void free_memory(int status, long double **ZON, long double **XDOM, long double **YDOM, int **ZMAP, long double **QMAP, long double **MIU, long double **THETA, long double **FI, long double **W, long double **LIST, long double **XVALS, long double **XVECTS, long double **YVALS, long double **YVECTS, long double **RM, long double **PV, long double **FM0, long double **FM1, long double **SM, long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW){
+  
+  if (status >= 3 || status == 0){
+    // INPUT VARIABLES
+    free(*ZON);     free(*XDOM);    free(*YDOM);    free(*ZMAP);    free(*QMAP);
+  }
+  
+  if (status >= 4 || status == 0){
+    // QUADRATURE VARIABLES
+    free(*MIU);     free(*THETA);   free(*FI);     free(*W);       free(*LIST);
 
-  // INPUT VARIABLES
-  free(*ZON);     free(*XDOM);    free(*YDOM);    free(*ZMAP);    free(*QMAP);
+    // SPECTRUM VARIABLES
+    free(*XVALS);   free(*XVECTS);  free(*YVALS);  free(*YVECTS);
 
-  // QUADRATURE VARIABLES
-  free(*MIU);     free(*THETA);   free(*FI);     free(*W);       free(*LIST);
+    // RESPONSE MATRIX VARIABLES
+    free(*RM);      free(*PV);      free(*FM0);    free(*FM1);     free(*SM);
+  }
 
-  // SPECTRUM VARIABLES
-  free(*XVALS);   free(*XVECTS);  free(*YVALS);  free(*YVECTS);
-
-  // RESPONSE MATRIX VARIABLES
-  free(*RM);      free(*PV);
-
-	// PRINCIPAL VARIABLES
-	//free(*MFLUX);	free(*MFLOW);	free(*XFLOW);	free(*YFLOW);
+  if (status >= 5 || status ==0){
+    // PRINCIPAL VARIABLES
+    free(*MFLUX);	free(*MFLOW);	free(*XFLOW);	free(*YFLOW);
+  }
+  
 }
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -170,9 +226,9 @@ int input_by_txt(int *N,                  // Quadrature order
                 int *nz,                  // Number of zones
                 long double **ZON,        // Zone entries
                 int *nxr,                 // Number of regions in X
-                int **XDOM,               // X Region entries
+                long double **XDOM,               // X Region entries
                 int *nyr,                 // Number of regions in Y
-                int **YDOM,               // Y Region entries
+                long double **YDOM,               // Y Region entries
                 int **ZMAP,               // Zone map
                 long double **QMAP,       // External source map
                 long double *BC,          // Boundary conditions
@@ -390,13 +446,17 @@ int input_by_txt(int *N,                  // Quadrature order
 ///////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////////////// GENERATE QUADRATURE
-void quad(int N,                // Quadrature order
+int quad(int N,                // Quadrature order
           long double **MIU,    // Ordinates in X
           long double **THETA,  // Ordinates in Y
           long double **FI,     // Ordinate list
           long double **W,       // Weight
           long double **LIST    // Ordinate list
           ){
+
+  if (N < 2 && N > 18 && N % 2 != 0){
+    return 1;
+  }
     
   // DIRECTIONS IN THE XY PLANE
   int M = N * (N + 2) / 2;
@@ -540,6 +600,8 @@ void quad(int N,                // Quadrature order
   for (int i = 0; i < N / 2; i++){
     (*LIST)[i] = chi[i];
   }
+
+  return 0;
     
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -1285,9 +1347,9 @@ int response_matrix(int N,               // Quadrature order
                      int nz,              // Number of zones
                      long double ZON[],   // Zone entries
                      int nxr,             // Number of regions in X
-                     int XDOM[],          // X region entries
+                     long double XDOM[],  // X region entries
                      int nyr,             // Number of regions in Y
-                     int YDOM[],          // Y regions entries
+                     long double YDOM[],  // Y regions entries
                      int ZMAP[],          // Zone mapping
                      long double QMAP[],  // External source mapping
                      long double MIU[],   // Ordinates in X
@@ -1298,7 +1360,10 @@ int response_matrix(int N,               // Quadrature order
                      long double YVALS[], // Eigenvalues of Y
                      long double YVECTS[],// Eigenvectors of Y
                      long double **RM,    // Response matrix
-                     long double **PV     // Particular vector
+                     long double **PV,    // Particular vector
+                     long double **FM0,   // Average flux matrix 0
+                     long double **FM1,   // Average flux matrix 1
+                     long double **SM     // Average Source
                      ){
   
   int M = N * (N + 2) / 2;
@@ -1306,11 +1371,12 @@ int response_matrix(int N,               // Quadrature order
   // OUTPUT MATRICES
   *RM = malloc(sizeof(long double) * 4 * M * M * nyr * nxr); assert(*RM != NULL);
   *PV = malloc(sizeof(long double) * 2 * M * nyr * nxr); assert(*PV != NULL);
+  *FM0 = malloc(sizeof(long double) * M * M * nyr * nxr); assert(*FM0 != NULL);
+  *FM1 = malloc(sizeof(long double) * M * M * nyr * nxr); assert(*FM1 != NULL);
+  *SM = malloc(sizeof(long double) * M * nyr * nxr); assert(*SM != NULL);
 
   for (int ry = 0; ry < nyr; ry++){
     for (int rx = 0; rx < nxr; rx++){
-
-      
 
       // AUXILIARY MATRICES
       long double *XA = NULL, *XE = NULL, *YA = NULL, *YE = NULL;
@@ -1337,6 +1403,38 @@ int response_matrix(int N,               // Quadrature order
       long double Q = QMAP[nxr * ry + rx];
 
       for (int m = 0; m < M; m++){
+
+        // AVERAGE FLUX MATRICES
+        (*SM)[nyr * (M*rx + m) + ry] = Q * (1 + c0 / (1 - c0)) / st;
+        long double k_miu, k_theta, k_w;
+        for (int k = 0; k < M; k++){
+          k_miu = MIU[k]; k_theta = THETA[k]; k_w = W[k];
+          (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = 0.25 * c0 * k_miu / (st * hx * (1 - c0));
+          (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry] = 0.25 * c0 * k_theta / (st * hy * (1 - c0));
+          if (m == k){
+            (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry]
+                                                          + k_miu / (st * hx);
+            (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry] = (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry]
+                                                          + k_theta / (st * hy);
+          }
+          if (k < M / 4){
+            (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry];
+            (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry] = (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry];
+          }
+          else if (k >= M / 4 && k < M / 2){
+            (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = - (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry];
+            (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry] = (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry];
+          }
+          else if (k >= M / 2 && k < 3 * M / 4){
+            (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = - (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry];
+            (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry] = - (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry];
+          }
+          else if (k >= 3 * M / 4 && k < M){
+            (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry];
+            (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry] = - (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry];
+          }
+        }
+
 
         if (m < M / 4){
           for (int k = 0; k < M; k++){
@@ -1459,6 +1557,15 @@ int response_matrix(int N,               // Quadrature order
       AUX2 = matrix_concat(M, M1, M2, M3, M4, &AUX2);
 
       AUX_INV = inv(2*M, AUX, &AUX_INV);
+      if (AUX_INV == NULL) {
+        free(XA); free(XE); free(YA); free(YE);
+        free(XB); free(YB); free(H);
+        free(XE_INV); free(YE_INV);
+        free(M1); free(M2); free(M3); free(M4);
+        free(TEMP0); free(TEMP1);
+        free(AUX); free(AUX2);
+        return 1;
+      }
 
       long double *RAUX = NULL;
       RAUX = matrix_mult2(2*M, AUX_INV, AUX2, &RAUX);
@@ -1513,4 +1620,189 @@ int response_matrix(int N,               // Quadrature order
   return 0;
 
 }
+
+
+long double* get_RM(int M, int nyr, int nxr, int ry, int rx, long double RM[], long double **OUTPUT){
+
+  if ((*OUTPUT) == NULL){
+    *OUTPUT = malloc(sizeof(long double) * 4 * M * M); assert(*OUTPUT != NULL);
+  }
+
+  for (int j = 0; j < 2 * M; j++){
+    for (int i = 0; i < 2 * M; i++){
+
+      (*OUTPUT)[2*M*j + i] = RM[nyr * (nxr * (2*M*j + i) + rx) + ry];
+
+    }
+  }
+
+  return *OUTPUT;
+
+}
+
+
+long double* get_PV(int M, int nyr, int nxr, int ry, int rx, long double PV[], long double **OUTPUT){
+
+  if ((*OUTPUT) == NULL){
+    *OUTPUT = malloc(sizeof(long double) * 2 * M); assert(*OUTPUT != NULL);
+  }
+
+  for (int i = 0; i < 2 * M; i++){
+
+    (*OUTPUT)[i] = PV[nyr * (2*M*rx + i) + ry];
+
+  }
+
+  return *OUTPUT;
+
+}
+
+
+long double* get_FM0(int M, int nyr, int nxr, int ry, int rx, long double FM0[], long double **OUTPUT){
+
+  if ((*OUTPUT) == NULL){
+    *OUTPUT = malloc(sizeof(long double) * M * M); assert(*OUTPUT != NULL);
+  }
+
+  for (int j = 0; j < M; j++){
+    for (int i = 0; i < M; i++){
+
+      (*OUTPUT)[M*j + i] = FM0[nyr * (nxr * (M*j + i) + rx) + ry];
+
+    }
+  }
+
+  return *OUTPUT;
+
+}
+
+
+long double* get_FM1(int M, int nyr, int nxr, int ry, int rx, long double FM1[], long double **OUTPUT){
+
+  if ((*OUTPUT) == NULL){
+    *OUTPUT = malloc(sizeof(long double) * M * M); assert(*OUTPUT != NULL);
+  }
+
+  for (int j = 0; j < M; j++){
+    for (int i = 0; i < M; i++){
+
+      (*OUTPUT)[M*j + i] = FM1[nyr * (nxr * (M*j + i) + rx) + ry];
+
+    }
+  }
+
+  return *OUTPUT;
+
+}
+
+long double* get_SM(int M, int nyr, int nxr, int ry, int rx, long double SM[], long double **OUTPUT){
+
+  if ((*OUTPUT) == NULL){
+    *OUTPUT = malloc(sizeof(long double) * M); assert(*OUTPUT != NULL);
+  }
+
+  for (int i = 0; i < M; i++){
+
+    (*OUTPUT)[i] = SM[nyr * (M*rx + i) + ry];
+
+  }
+
+  return *OUTPUT;
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////// RM_CN ITERATIVE SCHEME
+int rm_cn (int N,               // Quadrature order
+           int nz,              // Number of zones
+           long double ZON[],   // Zone entries
+           int nxr,             // Number of regions in X
+           long double XDOM[],  // X Region entries
+           int nyr,             // Number of regions in Y
+           long double YDOM[],  // Y Region entries
+           int ZMAP[],          // Zone map
+           long double QMAP[],  // External source map
+           long double BC[],    // Boundary conditions
+           long double tol,     // Tolerance
+           long double RM[],    // Response matrix
+           long double PV[],    // Source vector
+           long double FM0[],   // Average flux matrix 0
+           long double FM1[],   // Average flux matrix 1
+           long double SM[],    // Average source vector
+           long double **MFLUX, // Escalar flux in the nodes
+           long double **MFLOW, // Angular flux in the nodes
+           long double **XFLOW, // Angular flux at the y edges
+           long double **YFLOW  // Angular flux at the x edges
+           ){
+
+  // INITIALIZATION
+  int ntc_x = 0, ntc_y = 0;
+  for (int rx = 0; rx < nxr; rx++) {
+		ntc_x = ntc_x + (int)XDOM[2*rx + 1];
+	}
+	for (int ry = 0; ry < nyr; ry++) {
+		ntc_y = ntc_y + (int)YDOM[2 * ry + 1];
+	}
+  int M = N * (N + 2) / 2;
+  *MFLUX = malloc(sizeof(long double) * (ntc_y * ntc_x)); assert(*MFLUX != NULL);
+	*MFLOW = malloc(sizeof(long double) * (ntc_y * ntc_x) * M); assert(*MFLOW != NULL);
+	*XFLOW = malloc(sizeof(long double) * (ntc_y * (ntc_x + 1)) * M); assert(*XFLOW != NULL);
+	*YFLOW = malloc(sizeof(long double) * ((ntc_y + 1) * ntc_x) * M); assert(*YFLOW != NULL);
+  for (int j = 0; j < ntc_y; j++) {
+		for (int i = 0; i < ntc_x; i++) {
+			(*MFLUX)[ntc_x * j + i] = 0.0;
+			for (int m = 0; m < M; m++) {
+				(*MFLOW)[M * (ntc_x * j + i) + m] = 0.0;
+			}
+		}
+	}
+  for (int j = 0; j < ntc_y; j++) {
+		for (int i = 0; i < ntc_x + 1; i++) {
+			for (int m = 0; m < M; m++) {
+				(*XFLOW)[M * ((ntc_x + 1) * j + i) + m] = 0.0;
+				if ((i == 0) && (BC[0] != -1.0)) {
+					(*XFLOW)[M * ((ntc_x + 1) * j + i) + m] = BC[0];
+				}
+				if ((i == ntc_x) && (BC[2] != -1.0)) {
+					(*XFLOW)[M * ((ntc_x + 1) * j + i) + m] = BC[2];
+				}
+			}
+		}
+	}
+  for (int j = 0; j < ntc_y + 1; j++) {
+		for (int i = 0; i < ntc_x; i++) {
+			for (int m = 0; m < M; m++) {
+				(*YFLOW)[M * (ntc_x * j + i) + m] = 0.0;
+				if (j == 0 && BC[1] != -1.0) {
+					(*YFLOW)[M * (ntc_x * j + i) + m] = BC[1];
+				}
+				if (j == ntc_y && BC[3] != -1.0) {
+					(*YFLOW)[M * (ntc_x * j + i) + m] = BC[3];
+				}
+			}
+		}
+	}
+
+  // ITERATIVE PROCESS
+  clock_t start, end;
+  long double cpu_time;
+  printf("\nRM_CN ITERATIVE PROCESS:\n\n");
+	printf("ITER\tMAX_ERR (MFLUX)\n");
+  long double ERR = 1.0;
+  int ITER = -1;
+  start = clock();
+  while (ERR > tol || ITER < 10000){
+    ERR = 1.0; ITER = ITER + 1;
+
+
+  }
+  end = clock();
+  cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
+  printf("CPU TIME = %.5Le\n\n", cpu_time);
+
+  return 0;
+
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////
