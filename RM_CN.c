@@ -71,8 +71,13 @@ long double* get_FM1(int M, int nyr, int nxr, int ry, int rx, long double FM1[],
 long double* get_SM(int M, int nyr, int nxr, int ry, int rx, long double SM[], long double **OUTPUT);
 
 //////////////////////////////////////////////////////// RM_CN ITERATIVE SCHEME
-int rm_cn (int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol, long double W[], long double RM[], long double PV[], long double FM0[], long double FM1[], long double SM[], long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW);
+int rm_cn (int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol, long double W[], long double RM[], long double PV[], long double FM0[], long double FM1[], long double SM[], long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW, int *ITER, long double *cpu_time);
 
+////////////////////////////////////////////////////////// AUXILIARY FUNCTIONS
+void print_problem(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol);
+
+void post_processing(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double MIU[], long double THETA[], long double W[], long double MFLUX[], long double MFLOW[], long double XFLOW[], long double YFLOW[]);
+                  
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -109,7 +114,9 @@ int main(int argc, char *argv[]){
     status = 2;
     return 0;
   } 
-  //printf("input file loaded succesfully\n");
+  
+  // PRINT PROBLEM
+  print_problem(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol);
 
   // QUADRATURE VARIABLES
   long double *MIU = NULL;   // Ordinates in X
@@ -119,6 +126,7 @@ int main(int argc, char *argv[]){
   long double *LIST = NULL;  // Ordinates list
 
   // GENERATE QUADRATURE
+  int M = N * (N + 2) / 2;
   if (quad(N, &MIU, &THETA, &FI, &W, &LIST) != 0){
     status = 3;
     free_memory(status, &ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
@@ -128,6 +136,14 @@ int main(int argc, char *argv[]){
               NULL, NULL, NULL, NULL);
     return 0;
   };
+
+  // PRINT QUADRATURE
+  printf("\n\n2. QUADRATURE SETUP:\n\n");
+	printf("M\t MIU\t\t THETA\t\t W\n");
+	for (int m = 0; m < M; m++) {
+		printf("%d\t% .8Lf\t% .8Lf\t% .8Lf\n", m + 1, MIU[m], THETA[m], W[m]);
+	}
+	printf("\n");
 
   // SPECTRUM VARIABLES
   long double *XVALS = NULL;  // Eigenvalues in X
@@ -174,11 +190,14 @@ int main(int argc, char *argv[]){
   long double *MFLOW = NULL; // Angular flux in the nodes
   long double *XFLOW = NULL; // Angular flux at the y edges
   long double *YFLOW = NULL; // Angular flux at the x edges
+  int ITER;                  // Iterations
+  long double cpu_time;     // CPU time
 
   // ITERATIVE SCHEME
-  if (rm_cn (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, W, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW) != 0){
-    status = 5;
-  };
+  status = rm_cn (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, W, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW, &ITER, &cpu_time);
+
+  // POST PROCESSING
+  post_processing(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, MIU, THETA, W, MFLUX, MFLOW, XFLOW, YFLOW);
 
   // FREE MEMORY
   free_memory(status, &ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
@@ -1754,7 +1773,9 @@ int rm_cn (int N,               // Quadrature order
            long double **MFLUX, // Escalar flux in the nodes
            long double **MFLOW, // Angular flux in the nodes
            long double **XFLOW, // Angular flux at the y edges
-           long double **YFLOW  // Angular flux at the x edges
+           long double **YFLOW, // Angular flux at the x edges
+           int *ITER,            // Iteration
+           long double *cpu_time // CPU time
            ){
 
   // INITIALIZATION
@@ -1807,9 +1828,7 @@ int rm_cn (int N,               // Quadrature order
 
   // VARIABLES
   clock_t start, end;
-  long double cpu_time;
   long double ERR = 1.0;
-  int ITER = -1;
   int j_b, j_f, i_b, i_f;
   int nc_y, nc_x;
   long double *IN = NULL, *OUT = NULL; 
@@ -1831,11 +1850,11 @@ int rm_cn (int N,               // Quadrature order
   long double m_sum, w, flux0, flux;
 
   // ITERATIVE PROCESS
-  printf("\nRM_CN ITERATIVE PROCESS:\n\n");
+  printf("\n3. ITERATIVE PROCESS:\n\n");
 	printf("ITER\tMAX_ERR (MFLUX)\n");
-  start = clock();
-  while (ERR > tol && ITER < 10000){
-    ERR = 0.0; ITER = ITER + 1;
+  start = clock(); *ITER = -1;
+  while (ERR > tol && *ITER < 10000){
+    ERR = 0.0; *ITER = *ITER + 1;
 
     // 1. SW - > NE SWEEP
     j_b = 0; j_f = j_b + 1;
@@ -2186,19 +2205,254 @@ int rm_cn (int N,               // Quadrature order
       }
     }
 
-    printf("%d\t%.5Le\n", ITER, ERR);
+    printf("%d\t%.5Le\n", *ITER, ERR);
   }
   end = clock();
-  cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
-  printf("CPU TIME = %.5Le\n\n", cpu_time);
+  *cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
+  printf("CPU TIME = %.5Le\n\n", *cpu_time);
 
   free(IN); free(OUT); 
   free(RESP_MATRIX); free(PART_VECTOR); free(V_AUX);
   free(X_VECTOR); free(Y_VECTOR); free(M_VECTOR); free(V_AUX2);
   free(FM_0); free(FM_1); free(S_VECTOR);
 
+  if (*ITER >= 10000) return 5;
   return 0;
 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////// AUXILIARY FUNCTIONS
+void print_problem(int N,           // Quadrature order
+                   int nz,          // Number of zones
+                   long double ZON[],    // Zone entries
+                   int nxr,         // Number of regions in X
+                   long double XDOM[],      // X Region entries
+                   int nyr,         // Number of regions in Y
+                   long double YDOM[],      // Y Region entries
+                   int ZMAP[],      // Zone map
+                   long double QMAP[],   // External source map
+                   long double BC[],     // Boundary conditions
+                   long double tol      // Tolerance
+                  ){
+
+  printf("\n1. PROBLEM SETUP:\n\n");
+
+  // QUADRATURE ORDER
+  printf("N = %d\n\n", N);
+
+  // NUMBER OF ZONES
+  printf("NZ = %d\n\n", nz);
+
+  // ZONE ENTRIES
+	printf("ZON:\n");
+  printf("NO.\tS_T\tS_S\n");
+  for (int z = 0; z < nz; z++){
+      printf("%d\t%.4Lf\t%.4Lf\n", z+1, ZON[z*2], ZON[z*2 + 1]);
+  }
+  printf("\n");
+
+  // NUMBER OF REGIONS IN X
+  printf("NR_X = %d\n\n", nxr);
+
+  // REGION ENTRIES IN X
+	printf("XDOM:\n");
+  printf("No.\tLEN\tNODES\n");
+  for (int xr = 0; xr < nxr; xr++){
+      printf("%d\t%.2Lf\t%d\n", xr + 1, XDOM[xr * 2], (int)XDOM[xr * 2 + 1]);
+  }
+  printf("\n");
+
+  // NUMBER OF REGIONS IN Y
+  printf("NR_Y = %d\n\n", nyr);
+
+  // REGION ENTRIES IN Y
+	printf("YDOM:\n");
+  printf("NO.\tLEN\tNODES\n");
+  for (int yr = 0; yr < nyr; yr++){
+      printf("%d\t%.2Lf\t%d\n", yr + 1, YDOM[yr * 2], (int)YDOM[yr * 2 + 1]);
+  }
+  printf("\n");
+
+  // ZONE MAPPING
+  printf("ZMAP:\n");
+  for (int yr = 0; yr < nyr; yr++) {
+		for (int xr = 0; xr < nxr; xr++) {
+			printf("%d\t", ZMAP[yr * nxr + xr] + 1);
+		}
+		printf("\n");
+  }
+  printf("\n");
+
+  // EXTERNAL SOURCE MAPPING
+  printf("Q_MAP:\n");
+  for (int yr = 0; yr < nyr; yr++) {
+		for (int xr = 0; xr < nxr; xr++) {
+			printf("%.4Lf\t", QMAP[yr * nxr + xr]);
+		}
+		printf("\n");
+  }
+  printf("\n");
+
+  // BOUNDARY CONDITIONS
+	printf("BOUNDARY_CONDITIONS =\n");
+	for (int c = 0; c < 4; c++) {
+		printf("%d. ", c + 1);
+		if (BC[c] == 0.0) printf("Vacuum\n");
+		else if (BC[c] == -1.0) printf("Reflective\n");
+    else printf("Isotropic %.2f\n", BC[c]);
+	}
+	printf("\n");
+
+  // TOLERANCE
+	printf("TOL = %.4Le\n\n", tol);
+
+}
+
+
+void post_processing(int N,               // Quadrature order
+                     int nz,              // Number of zones
+                     long double ZON[],   // Zone entries
+                     int nxr,             // Number of regions in X
+                     long double XDOM[],  // X Region entries
+                     int nyr,             // Number of regions in Y
+                     long double YDOM[],  // Y Region entries
+                     int ZMAP[],          // Zone map
+                     long double QMAP[],  // External source map
+                     long double BC[],    // Boundary conditions
+                     long double MIU[],   // Ordinates in X
+                     long double THETA[], // Ordinates in Y
+                     long double W[],     // Weight
+	                   long double MFLUX[], // Scalar flux in the nodes
+                     long double MFLOW[], // Angular flux in the nodes
+                     long double XFLOW[], // Angular flux at the y edges
+                     long double YFLOW[]  // Angular flux at the x edges
+					 ){
+	
+	// INICIALIZATION
+	int j_b = 0, i_b = 0, j_f, i_f, ntc_x = 0, ntc_y = 0;;
+	int nc_y, nc_x, z;
+	long double h_y, h_x, area_r, sa, miu, theta, w, len_y, len_x;
+	long double *MFLUX_R = NULL, *ABS_R = NULL, FUGA[4] = {0.0};
+	MFLUX_R = malloc(sizeof(double)*nyr*nxr); assert(MFLUX_R != NULL);
+	ABS_R = malloc(sizeof(double)*nyr*nxr); assert(ABS_R != NULL);
+	for (int ry = 0; ry < nyr; ry++) {
+		for (int rx = 0; rx < nxr; rx++) {
+			MFLUX_R[nxr*ry + rx] = 0.0;
+			ABS_R[nxr*ry + rx] = 0.0;
+		}
+	}
+  for (int rx = 0; rx < nxr; rx++) {
+		ntc_x = ntc_x + (int)XDOM[2*rx + 1];
+	}
+	for (int ry = 0; ry < nyr; ry++) {
+		ntc_y = ntc_y + (int)YDOM[2 * ry + 1];
+	}
+  int M = N * (N + 2) / 2;
+
+	// CALCULATION OF MFLUX and ABS_R
+	for(int ry = 0; ry < nyr; ry++){
+		len_y = YDOM[2*ry]; nc_y = YDOM[2*ry + 1]; h_y = (long double)len_y/nc_y;
+		for(int j = 0; j < nc_y; j++){
+			i_b = 0;
+			for(int rx = 0; rx < nxr; rx++){
+				len_x = XDOM[2*rx]; nc_x = XDOM[2*rx + 1]; h_x = (long double)len_x/nc_x; 
+				area_r = len_y*len_x; z = ZMAP[nxr*ry + rx];
+				sa = ZON[2*z] - ZON[2*z + 1];
+				for(int i = 0; i < nc_x; i++){
+					MFLUX_R[nxr*ry + rx] = MFLUX_R[nxr*ry + rx] + h_y*h_x*MFLUX[ntc_x*j_b + i_b]/area_r;
+					ABS_R[nxr*ry + rx] = ABS_R[nxr*ry + rx] + sa*h_y*h_x*MFLUX[ntc_x*j_b + i_b];
+					i_b = i_b + 1;
+				}
+			}
+			j_b = j_b + 1;
+		}
+	}
+
+	// CALCULATION OF THE LEAKAGE FROM THE LEFT AND THE RIGHT BOUNDARIES
+	j_b = 0;
+	for(int ry = 0; ry < nyr; ry++){
+		len_y = YDOM[2*ry]; nc_y = YDOM[2*ry + 1]; h_y = (long double)len_y/nc_y;
+		for(int j = 0; j < nc_y; j++){
+			// LEFT
+			for (int m = M/4; m < 3*M/4; m++){
+				miu = MIU[m]; w = W[m];	                          
+				FUGA[0] = FUGA[0] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + 0) + m];
+			}
+			// RIGHT
+			for (int m = 0; m < M/4; m++){
+				miu = MIU[m]; w = W[m];		                          
+				FUGA[2] = FUGA[2] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + m];
+			}
+			for (int m = 3*M/4; m < M; m++){
+				miu = MIU[m]; w = W[m];		                          
+				FUGA[2] = FUGA[2] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + m];
+			}                         
+			j_b = j_b + 1;
+		}
+	}
+
+	// CALCULATION OF THE LEAKAGE FROM THE BOTTOM AND THE TOP BOUNDARIES
+	i_b = 0;
+	for(int rx = 0; rx < nxr; rx++){
+		len_x = XDOM[2*rx]; nc_x = XDOM[2*rx + 1]; h_x = (long double)len_x/nc_x;
+		for(int i = 0; i < nc_x; i++){
+			for (int m = M/2; m < M; m++){
+				theta = THETA[m]; w = W[m];   	
+				FUGA[1] = FUGA[1] + 0.5*h_x*w*theta*YFLOW[M * (ntc_x * 0 + i_b) + m];
+			}
+			for (int m = 0; m < M/2; m++){
+				theta = THETA[m]; w = W[m];
+				FUGA[3] = FUGA[3] + 0.5*h_x*w*theta*YFLOW[M * (ntc_x * ntc_y + i_b) + m];
+			}
+			i_b = i_b + 1;
+		}
+	}
+
+	// PRINT POST PROCESSING
+	printf("\n\n4. POST - PROCESSING:\n\n");
+
+	// SCALAR FLUX PER REGION
+	printf("SCALAR FLUX PER REGION =\n");
+	for (int rx = 0; rx < nxr; rx++) {
+		printf("\tRX_%d\t", rx + 1);
+	}
+	printf("\n");
+	for (int ry = 0; ry < nyr; ry++) {
+		printf("RY_%d\t", ry + 1);
+		for (int rx = 0; rx < nxr; rx++) {
+			printf("% .5Le\t", MFLUX_R[nxr * ry + rx]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	// ABSORPTION RATE PER REGION
+	printf("ABSORPTION RATE PER REGION =\n");
+	for (int rx = 0; rx < nxr; rx++) {
+		printf("\tRX_%d\t", rx + 1);
+	}
+	printf("\n");
+	for (int ry = 0; ry < nyr; ry++) {
+		printf("RY_%d\t", ry + 1);
+		for (int rx = 0; rx < nxr; rx++) {
+			printf("% .5Le\t", ABS_R[nxr * ry + rx]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	// LEAKAGE
+    printf("LEAKAGE =\n");
+	printf("LEFT\t\tBOTTOM\t\tRIGHT\t\tTOP\n");
+    for(int i = 0; i < 4; i++){
+    	if (BC[i] == -1.0) printf("-\t\t");
+		else printf("%.4Le\t", FUGA[i]);
+	}
+	printf("\n\n");
+	
+	free(MFLUX_R); free(ABS_R);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
