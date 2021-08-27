@@ -76,7 +76,7 @@ int rm_cn (int N, int nz, long double ZON[], int nxr, long double XDOM[], int ny
 ////////////////////////////////////////////////////////// AUXILIARY FUNCTIONS
 void print_problem(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol);
 
-void post_processing(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double MIU[], long double THETA[], long double W[], long double MFLUX[], long double MFLOW[], long double XFLOW[], long double YFLOW[]);
+void post_processing(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double MIU[], long double THETA[], long double W[], int status, int ITER, long double cpu_time, long double MFLUX[], long double MFLOW[], long double XFLOW[], long double YFLOW[]);
                   
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -176,12 +176,13 @@ int main(int argc, char *argv[]){
   };
 
   // PRINT RESPONSE MATRIZ
-  // int M = N * (N + 2) / 2;
   // long double *RAUX = NULL;
+  // printf("FM0:\n");
   // for (int ry = 0; ry < nyr; ry++){
   //   for (int rx = 0; rx < nxr; rx++){
-  //     RAUX = get_RM(M, nyr,nxr,ry,rx,RM,&RAUX);
-  //     print_matrix(2*M,RAUX);
+  //     printf("RY = %d, RX = %d:\n", ry, rx);
+  //     RAUX = get_FM0(M, nyr,nxr,ry,rx,FM0,&RAUX);
+  //     print_matrix(M,RAUX);
   //   }
   // }
 
@@ -197,7 +198,7 @@ int main(int argc, char *argv[]){
   status = rm_cn (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, W, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW, &ITER, &cpu_time);
 
   // POST PROCESSING
-  post_processing(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, MIU, THETA, W, MFLUX, MFLOW, XFLOW, YFLOW);
+  post_processing(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, MIU, THETA, W, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
 
   // FREE MEMORY
   free_memory(status, &ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
@@ -206,7 +207,6 @@ int main(int argc, char *argv[]){
               &RM, &PV, &FM0, &FM1, &SM,
               &MFLUX, &MFLOW, &XFLOW, &YFLOW);
 
-  printf("%d\n", status);
   return 0;
 
 }
@@ -1448,8 +1448,8 @@ int response_matrix(int N,               // Quadrature order
         long double k_miu, k_theta, k_w;
         for (int k = 0; k < M; k++){
           k_miu = MIU[k]; k_theta = THETA[k]; k_w = W[k];
-          (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = 0.25 * c0 * k_miu / (st * hx * (1 - c0));
-          (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry] = 0.25 * c0 * k_theta / (st * hy * (1 - c0));
+          (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = 0.25 * c0 * k_w * k_miu / (st * hx * (1 - c0));
+          (*FM1)[nyr * (nxr * (M * m + k) + rx) + ry] = 0.25 * c0 * k_w * k_theta / (st * hy * (1 - c0));
           if (m == k){
             (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry]
                                                           + k_miu / (st * hx);
@@ -1588,12 +1588,14 @@ int response_matrix(int N,               // Quadrature order
       M4 = eye(M, &M4);
 
       AUX = matrix_concat(M, M1, M2, M3, M4, &AUX);
+      
 
       M1 = matrix_mult2(M, XA, XE_INV, &M1);
 
       M4 = matrix_mult2(M, YA, YE_INV, &M4);
 
       AUX2 = matrix_concat(M, M1, M2, M3, M4, &AUX2);
+      
 
       AUX_INV = inv(2*M, AUX, &AUX_INV);
       if (AUX_INV == NULL) {
@@ -1605,6 +1607,8 @@ int response_matrix(int N,               // Quadrature order
         free(AUX); free(AUX2);
         return 1;
       }
+      // printf("AUX_INV ry = %d, rx = %d:\n", ry, rx);
+      // print_matrix(2*M, AUX_INV);
 
       long double *RAUX = NULL;
       RAUX = matrix_mult2(2*M, AUX_INV, AUX2, &RAUX);
@@ -2045,7 +2049,7 @@ int rm_cn (int N,               // Quadrature order
       nc_y = (int)YDOM[2 * ry + 1]; 
       for (int j = 0; j < nc_y; j++) {
         i_b = 0; i_f = i_b + 1;
-        for (int rx = 0; rx < 0; rx++) {
+        for (int rx = 0; rx < nxr; rx++) {
           RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
           PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
           nc_x = (int)XDOM[2 * rx + 1];
@@ -2147,7 +2151,7 @@ int rm_cn (int N,               // Quadrature order
           FM_0 = get_FM0(M, nyr, nxr, ry, rx, FM0, &FM_0);
           FM_1 = get_FM1(M, nyr, nxr, ry, rx, FM1, &FM_1);
           S_VECTOR = get_SM(M, nyr, nxr, ry, rx, SM, &S_VECTOR);
-          for (int j = 0; j < nc_x; j++){
+          for (int j = 0; j < nc_y; j++){
 
             for (int m = 0; m < M; m++){
               if (m < M / 4){
@@ -2324,6 +2328,9 @@ void post_processing(int N,               // Quadrature order
                      long double MIU[],   // Ordinates in X
                      long double THETA[], // Ordinates in Y
                      long double W[],     // Weight
+                     int status,          // Status
+                     int ITER,            // Iterations
+                     long double cpu_time, // CPU time
 	                   long double MFLUX[], // Scalar flux in the nodes
                      long double MFLOW[], // Angular flux in the nodes
                      long double XFLOW[], // Angular flux at the y edges
@@ -2335,8 +2342,8 @@ void post_processing(int N,               // Quadrature order
 	int nc_y, nc_x, z;
 	long double h_y, h_x, area_r, sa, miu, theta, w, len_y, len_x;
 	long double *MFLUX_R = NULL, *ABS_R = NULL, FUGA[4] = {0.0};
-	MFLUX_R = malloc(sizeof(double)*nyr*nxr); assert(MFLUX_R != NULL);
-	ABS_R = malloc(sizeof(double)*nyr*nxr); assert(ABS_R != NULL);
+	MFLUX_R = malloc(sizeof(long double)*nyr*nxr); assert(MFLUX_R != NULL);
+	ABS_R = malloc(sizeof(long double)*nyr*nxr); assert(ABS_R != NULL);
 	for (int ry = 0; ry < nyr; ry++) {
 		for (int rx = 0; rx < nxr; rx++) {
 			MFLUX_R[nxr*ry + rx] = 0.0;
@@ -2352,6 +2359,7 @@ void post_processing(int N,               // Quadrature order
   int M = N * (N + 2) / 2;
 
 	// CALCULATION OF MFLUX and ABS_R
+  j_b = 0;
 	for(int ry = 0; ry < nyr; ry++){
 		len_y = YDOM[2*ry]; nc_y = YDOM[2*ry + 1]; h_y = (long double)len_y/nc_y;
 		for(int j = 0; j < nc_y; j++){
@@ -2453,6 +2461,117 @@ void post_processing(int N,               // Quadrature order
 	printf("\n\n");
 	
 	free(MFLUX_R); free(ABS_R);
+
+  ///////////////////////////////////////////////////////// JSON OUTPUTS
+
+  // STATUS
+  printf("{\n\"STATUS\": %d", status);
+
+  if (status != 0) printf("\n}\n");
+  else {
+
+    // ITERATIONS
+    printf(",\n\"ITER\": %d,\n", ITER);
+
+    // CPU TIME
+    printf("\"CPU\": %.10Le,\n");
+
+    // MFLUX
+    printf("\"MFLUX\": [\n");
+    j_b = 0;
+    for(int ry = 0; ry < nyr; ry++){
+      nc_y = (int)YDOM[2*ry + 1];
+      for(int j = 0; j < nc_y; j++){
+        i_b = 0;
+        printf("[");
+        for(int rx = 0; rx < nxr; rx++){
+          nc_x = (int)XDOM[2*rx + 1];
+          for(int i = 0; i < nc_x; i++){
+            if (i_b == ntc_x - 1) {
+              if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLUX[ntc_x*j_b + i_b]);
+              else printf(" %.10Le ],\n", MFLUX[ntc_x*j_b + i_b]);
+            }
+            else printf(" %.10Le,", MFLUX[ntc_x*j_b + i_b]);
+            i_b = i_b + 1;
+          }
+        }
+        j_b = j_b + 1;
+      }
+    }
+    printf("],\n");
+
+    // XFLOW
+    printf("\"XFLOW\": [\n");
+    for (int m = 0; m < M; m++){
+      j_b = 0;
+      printf("[\n");
+      for(int ry = 0; ry < nyr; ry++){
+        nc_y = (int)YDOM[2*ry + 1];
+        for(int j = 0; j < nc_y; j++){
+          i_b = 0;
+          printf("[");
+          for(int rx = 0; rx < nxr; rx++){
+            nc_x = (int)XDOM[2*rx + 1];
+            for(int i = 0; i < nc_x; i++){
+              printf(" %.10Le,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+              i_b = i_b + 1;
+            }
+          }
+          if (i_b == ntc_x) {
+            if (j_b == ntc_y - 1) printf(" %.10Le ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+            else printf(" %.10Le ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+          }
+          j_b = j_b + 1;
+        }
+      }
+      if (m == M-1) printf("]\n");
+      else printf("],\n");
+    }
+    printf("],\n");
+
+    // YFLOW
+    printf("\"YFLOW\": [\n");
+    for (int m = 0; m < M; m++){
+      j_b = 0;
+      printf("[\n");
+      for(int ry = 0; ry < nyr; ry++){
+        nc_y = (int)YDOM[2*ry + 1];
+        for(int j = 0; j < nc_y; j++){
+          i_b = 0;
+          printf("[");
+          for(int rx = 0; rx < nxr; rx++){
+            nc_x = (int)XDOM[2*rx + 1];
+            for(int i = 0; i < nc_x; i++){
+              if (i_b == ntc_x - 1) printf(" %.10Le ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+              else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+              i_b = i_b + 1;
+            }
+          }
+          j_b = j_b + 1;
+        }
+      }
+      if (j_b == ntc_y){
+        i_b = 0;
+        printf("[");
+        for(int rx = 0; rx < nxr; rx++){
+          nc_x = (int)XDOM[2*rx + 1];
+          for(int i = 0; i < nc_x; i++){
+            if (i_b == ntc_x - 1) printf(" %.10Le ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+            else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+            i_b = i_b + 1;
+          }
+        }
+      }
+      if (m == M-1) printf("]\n");
+      else printf("],\n");
+    }
+    printf("]\n");
+
+    printf("}\n");
+  }
+
+  ///////////////////////////////////////////////////////////////////////
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
