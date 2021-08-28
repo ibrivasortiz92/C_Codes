@@ -1,217 +1,300 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
-#include <string.h>
 #include <math.h>
+#include <time.h>
+#include <assert.h>
+#define printf __mingw_printf
+#define eps 1e-12
 
-/////////////////////////////////////////////////////////// PROTOTYPES
+//////////////////////////////////////////////////////////////////////////////////// PROTOTYPES
 
-// LOAD PROBLEM FROM FILE
-int input_by_txt(int *N, int *nz, double **ZON, int *nxr, int **XDOM, int *nyr, int **YDOM, int **ZMAP, double **QMAP, double *BC, double *tol, const char *filename);
+///////////////////////////////////////////////////////// FREE MEMORY REQUESTED
+void free_memory(long double **ZON, long double **XDOM, long double **YDOM, int **ZMAP, long double **QMAP, long double **MIU, long double **THETA, long double **FI, long double **W, long double **LIST, long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW);
 
-// FREE MEMORY REQUESTED
-void free_memory(double **ZON, int **XDOM, int **YDOM, int **ZMAP, double **QMAP, double **MIU, double **THETA, double **CHI, double **W, double **MFLUX, double **MFLOW, double **XFLOW, double **YFLOW);
+//////////////////////////////////////////////////////// LOAD PROBLEM FROM FILE
+int input_by_txt(int *N, int *nz, long double **ZON, int *nxr, long double **XDOM, int *nyr, long double **YDOM, int **ZMAP, long double **QMAP, long double *BC, long double *tol, const char *filename);
 
-// GENERATE QUADRATURE
-void quad(int N, double **MIU, double **THETA, double **CHI, double **W);
+/////////////////////////////////////////////////////////// GENERATE QUADRATURE
+int quad(int N, long double **MIU, long double **THETA, long double **CHI, long double **W, long double **LIST);
 
-// DD_2D METHOD
-void dd_2d(int N, int nz, double ZON[], int nxr, int XDOM[], int nyr, int YDOM[], int ZMAP[], double QMAP[], double BC[], double tol, double MIU[], double THETA[], double W[], double **MFLUX, double **MFLOW, double **XFLOW, double **YFLOW);
+/////////////////////////////////////////////////////////// DD ITERATIVE SCHEME
+int dd (int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol, long double MIU[], long double THETA[], long double W[], long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW, int *ITER, long double *cpu_time);
 
-// POST PROCESSING
-void post_processing(int N, int nz, double ZON[], int nxr, int XDOM[], int nyr, int YDOM[], int ZMAP[], double QMAP[], double BC[], double MIU[], double THETA[], double W[], double MFLUX[], double MFLOW[], double XFLOW[], double YFLOW[]);
+////////////////////////////////////////////////////////// AUXILIARY FUNCTIONS
+void print_problem(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol);
 
+void post_processing(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double MIU[], long double THETA[], long double W[], long double MFLUX[], long double MFLOW[], long double XFLOW[], long double YFLOW[]);
+
+void json_output(int N, int nxr, long double XDOM[], int nyr, long double YDOM[], int status, int ITER, long double cpu_time, long double MFLUX[], long double MFLOW[], long double XFLOW[], long double YFLOW[]);
+                  
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////////////////////////////////////////////////////////// MAIN
 int main(int argc, char *argv[]){
-  if (argc != 2){
-    puts("Usage: ./dd <input.txt>");
-    return 1;
-  }
+
+  int status = 0;
 
   // INPUT VARIABLES
-  int N;                // Quadrature order
-  int nz;               // Number of zones
-  double *ZON = NULL;   // Zone entries
-  int nxr;              // Number of regions in X
-  int *XDOM = NULL;     // X Region entries
-  int nyr;              // Number of regions in Y
-  int *YDOM = NULL;     // Y Region entries
-  int *ZMAP = NULL;     // Zone map
-  double *QMAP = NULL;  // External source map
-  double BC[4];         // Boundary conditions
-  double tol;           // Tolerance
-  const char *filename; // File name to load
-
-  filename = argv[1];
-
-  // LOAD PROBLEM
-  if (input_by_txt(&N, &nz, &ZON, &nxr, &XDOM, &nyr, &YDOM, &ZMAP, &QMAP, BC, &tol, filename) > 0) return 1;
+  int N = 0;                   // Quadrature order
+  int nz = 0;                  // Number of zones
+  long double *ZON = NULL;     // Zone entries
+  int nxr = 0;                 // Number of regions in X
+  long double *XDOM = NULL;    // X Region entries
+  int nyr = 0;                 // Number of regions in Y
+  long double *YDOM = NULL;    // Y Region entries
+  int *ZMAP = NULL;            // Zone map
+  long double *QMAP = NULL;    // External source map
+  long double BC[4] = {0.0};   // Boundary conditions
+  long double tol = 0.0;       // Tolerance
+  const char *filename = NULL; // File name to load
 
   // QUADRATURE VARIABLES
-  double *MIU = NULL;   // Ordinates in X
-  double *THETA = NULL; // Ordinates in Y
-  double *CHI = NULL;   // Ordinates in Z
-  double *W = NULL;     // Weight
-
-  // GENERATE AND PRINT QUADRATURE
-  quad(N, &MIU, &THETA, &CHI, &W);
+  long double *MIU = NULL;   // Ordinates in X
+  long double *THETA = NULL; // Ordinates in Y
+  long double *FI = NULL;    // Ordinates in Z
+  long double *W = NULL;     // Weight
+  long double *LIST = NULL;  // Ordinates list
 
   // PRINCIPAL VARIABLES
-  double *MFLUX = NULL; // Escalar flux in the nodes
-  double *MFLOW = NULL; // Angular flux in the nodes
-  double *XFLOW = NULL; // Angular flux at the y edges
-  double *YFLOW = NULL; // Angular flux at the x edges
+  long double *MFLUX = NULL;  // Escalar flux in the nodes
+  long double *MFLOW = NULL;  // Angular flux in the nodes
+  long double *XFLOW = NULL;  // Angular flux at the y edges
+  long double *YFLOW = NULL;  // Angular flux at the x edges
+  int ITER = -1;              // Iterations
+  long double cpu_time = 0.0; // CPU time
 
-  // METHOD
-  dd_2d(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, MIU, THETA, W, &MFLUX, &MFLOW, &XFLOW, &YFLOW);
+  if (argc != 2){
+    // Usage: ./RM_CN <input>
+    status = 1;
+    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    return 0;
+  }
 
-  // JSON OUTPUT
+  // LOAD PROBLEM
+  filename = argv[1];
+  status = input_by_txt(&N, &nz, &ZON, &nxr, &XDOM, &nyr, &YDOM, &ZMAP, &QMAP, BC, &tol, filename);
+  if (status != 0) {
+    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    return 0;
+  }
+  
+  // PRINT PROBLEM
+  print_problem(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol);
+
+  // GENERATE QUADRATURE
+  int M = N * (N + 2) / 2;
+  status = quad(N, &MIU, &THETA, &FI, &W, &LIST);
+  if (status != 0){
+    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
+                &MIU, &THETA, &FI, &W, &LIST,
+                &MFLUX, &MFLOW, &XFLOW, &YFLOW);
+    return 0;
+  };
+
+  // PRINT QUADRATURE
+  printf("\n\n2. QUADRATURE SETUP:\n\n");
+	printf("M\t MIU\t\t THETA\t\t W\n");
+	for (int m = 0; m < M; m++) {
+		printf("%d\t% .8Lf\t% .8Lf\t% .8Lf\n", m + 1, MIU[m], THETA[m], W[m]);
+	}
+	printf("\n");
+
+  // ITERATIVE SCHEME
+  status = dd (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, MIU, THETA, W, &MFLUX, &MFLOW, &XFLOW, &YFLOW, &ITER, &cpu_time);
+  if (status != 0){
+    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
+                &MIU, &THETA, &FI, &W, &LIST,
+                &MFLUX, &MFLOW, &XFLOW, &YFLOW);
+    return 0;
+  };
+
+  // POST PROCESSING
   post_processing(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, MIU, THETA, W, MFLUX, MFLOW, XFLOW, YFLOW);
+
+  // JSON OUTPUTS
+  json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
 
   // FREE MEMORY
   free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
-              &MIU, &THETA, &CHI, &W,
+              &MIU, &THETA, &FI, &W, &LIST,
               &MFLUX, &MFLOW, &XFLOW, &YFLOW);
 
   return 0;
-}
 
-////////////////////////////////////////////////////////// LOAD PROBLEM FROM FILE
-int input_by_txt(int *N,             // Quadrature order
-                int *nz,             // Number of zones
-                double **ZON,        // Zone entries
-                int *nxr,            // Number of regions in X
-                int **XDOM,          // X Region entries
-                int *nyr,            // Number of regions in Y
-                int **YDOM,          // Y Region entries
-                int **ZMAP,          // Zone map
-                double **QMAP,       // External source map
-                double *BC,          // Boundary conditions
-                double *tol,         // Tolerance
-                const char *filename // File name to load
+}
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////////////////////////////////// IMPLEMENTATION
+
+///////////////////////////////////////////////////////// FREE MEMORY REQUESTED
+void free_memory(long double **ZON, long double **XDOM, long double **YDOM, int **ZMAP, long double **QMAP, long double **MIU, long double **THETA, long double **FI, long double **W, long double **LIST, long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW){
+  
+  // INPUT VARIABLES
+  if (*ZON != NULL) free(*ZON); if (*XDOM != NULL) free(*XDOM); if (*YDOM != NULL) free(*YDOM); 
+  if (*ZMAP != NULL) free(*ZMAP); if (*QMAP != NULL) free(*QMAP);
+
+  // QUADRATURE VARIABLES
+  if (*MIU != NULL) free(*MIU); if (*THETA != NULL) free(*THETA); if (*FI != NULL) free(*FI);
+  if (*W != NULL) free(*W); if (*LIST != NULL) free(*LIST);
+  
+  // PRINCIPAL VARIABLES
+  if (*MFLUX != NULL) free(*MFLUX); if (*MFLOW != NULL) free(*MFLOW);
+  if (*XFLOW != NULL) free(*XFLOW); if (*YFLOW != NULL) free(*YFLOW);
+  
+}
+///////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////// LOAD PROBLEM FROM FILE
+int input_by_txt(int *N,                  // Quadrature order
+                int *nz,                  // Number of zones
+                long double **ZON,        // Zone entries
+                int *nxr,                 // Number of regions in X
+                long double **XDOM,       // X Region entries
+                int *nyr,                 // Number of regions in Y
+                long double **YDOM,       // Y Region entries
+                int **ZMAP,               // Zone map
+                long double **QMAP,       // External source map
+                long double *BC,          // Boundary conditions
+                long double *tol,         // Tolerance
+                const char *filename      // File name to load
                 ){
 
   FILE *cfPtr = NULL;
   if ((cfPtr = fopen(filename, "r")) == NULL){
-      puts ("Error opening input file!");
-      return 1;
+      //Error opening input file
+      return 2;
   }
 
   // QUADRATURE ORDER
   if (fscanf(cfPtr, "%d", N) == 0){
-      puts("Error reading input file!");
+      // Error reading input file
       return 2;
   }
-	if (*N < 2 || *N > 18){
-		puts("Invalid quadrature order (N)!\n\n"
-		     "\tValue must be an even number between 2 and 18.");
+	if (*N < 2 || *N > 18 || (*N)%2 != 0){
+		// Invalid quadrature order (N)
+	  // Value must be an even number between 2 and 18
 		return 2;
 	}
 
   // NUMBER OF ZONES
   if (fscanf(cfPtr, "%d", nz) == 0){
-      puts("Error reading input file!");
+      // Error reading input file
       return 2;
   }
 	if (*nz < 1){
-		puts("Invalid number of zones (NZ)!\n\n"
-		     "\tValue must be greater than 1.");
+		// Invalid number of zones (NZ)
+		// Value must be greater than 1
 		return 2;
 	}
 
   // ZONE FILLING
-  *ZON = malloc(sizeof(double) * (*nz * 2)); assert(*ZON != NULL);
+  *ZON = malloc(sizeof(long double) * (*nz * 2)); if(*ZON == NULL) return 3;
   double st, ss;
 	int zone_count = 0;
   for (int z = 0; z < *nz; z++){
       if (fscanf(cfPtr, "%lf %lf", &st, &ss) == 0){
-          puts("Error reading input file!");
-    free(*ZON);
+          // Error reading input file
+          free(*ZON);
           return 2;
       }
-      (*ZON)[z * 2] = st; (*ZON)[z * 2 + 1] = ss;
-  zone_count = zone_count + 1;
+      (*ZON)[z * 2] = (long double)st; (*ZON)[z * 2 + 1] = (long double)ss;
+      zone_count = zone_count + 1;
   }
 	if (zone_count != *nz){
 		free(*ZON);
-		puts("Error reading the entries of ZON:\n\n"
-		     "\tMust be provided the same number of rows as the number of zones.");
+		// Error reading the entries of ZON:
+		// Must be provided the same number of rows as the number of zones
 		return 2;
 	}
 
   // NUMBER OF REGIONS IN X
   if (fscanf(cfPtr, "%d", nxr) == 0){
-      puts("Error reading input file!");
-  free(*ZON);
-      return 2;
+    //Error reading input file
+    free(*ZON);
+    return 2;
   }
 	if (*nxr < 1){
 		free(*ZON);
-		puts("Invalid number of regions in X (NR_X)!\n\n"
-		     "\tValue must be greater than 1.");
+		// Invalid number of regions in X (NR_X):
+		// Value must be greater than 1
 		return 2;
 	}
 
   // REGION FILLING IN X
-  *XDOM = malloc(sizeof(int) * (*nxr * 2)); assert(*XDOM != NULL);
-  int len, nodes, rx_count = 0;;
+  *XDOM = malloc(sizeof(long double) * (*nxr * 2)); 
+  if(*XDOM == NULL){
+    free(*ZON); return 3;
+  }
+  int rx_count = 0;
+  double len, nodes;
   for (int xr = 0; xr < *nxr; xr++){
-      if (fscanf(cfPtr, "%d %d", &len, &nodes) == 0){
-          puts("Error reading input file!");
-    free(*ZON); free(*XDOM);
-          return 2;
-      }
-      (*XDOM)[xr * 2] = len; (*XDOM)[xr * 2 + 1] = nodes;
-  rx_count = rx_count + 1;
+    if (fscanf(cfPtr, "%lf %lf", &len, &nodes) == 0){
+      // Error reading input file
+      free(*ZON); free(*XDOM);
+      return 2;
+    }
+    (*XDOM)[xr * 2] = (long double)len; (*XDOM)[xr * 2 + 1] = (long double)nodes;
+    rx_count = rx_count + 1;
   }
 	if (rx_count != *nxr){
 		free(*ZON); free(*XDOM);
-		puts("Error reading the entries of XDOM:\n\n"
-		     "\tMust be provided the same number of rows as the number of regions in X.");
+		// Error reading the entries of XDOM:
+		// Must be provided the same number of rows as the number of regions in X
 		return 2;
 	}
 
   // NUMBER OF REGIONS IN Y
   if (fscanf(cfPtr, "%d", nyr) == 0){
-      puts("Error reading input file!");
-  free(*ZON); free(*XDOM);
-      return 2;
+    // Error reading input file
+    free(*ZON); free(*XDOM);
+    return 2;
   }
 	if (*nxr < 1){
 		free(*ZON); free(*XDOM);
-		puts("Invalid number of regions in Y (NR_Y)!\n\n"
-		     "\tValue must be greater than 1.");
+		// Invalid number of regions in Y (NR_Y):
+		// Value must be greater than 1.");
 		return 2;
 	}
 
   // REGION FILLING IN Y
-  *YDOM = malloc(sizeof(int) * (*nyr * 2)); assert(*YDOM != NULL);
+  *YDOM = malloc(sizeof(long double) * (*nyr * 2));
+  if(*YDOM == NULL){
+    free(*ZON); free(*XDOM); return 3;
+  }
 	int ry_count = 0;
   for (int yr = 0; yr < *nyr; yr++){
-      if (fscanf(cfPtr, "%d %d", &len, &nodes) == 0){
-          puts("Error reading input file!");
-    free(*ZON); free(*XDOM); free(*YDOM);
-          return 2;
-      }
-      (*YDOM)[yr * 2] = len; (*YDOM)[yr * 2 + 1] = nodes;
-  ry_count = ry_count + 1;
+    if (fscanf(cfPtr, "%lf %lf", &len, &nodes) == 0){
+      // Error reading input file
+      free(*ZON); free(*XDOM); free(*YDOM);
+      return 2;
+    }
+    (*YDOM)[yr * 2] = (long double)len; (*YDOM)[yr * 2 + 1] = (long double)nodes;
+    ry_count = ry_count + 1;
   }
 	if (ry_count != *nyr){
 		free(*ZON); free(*XDOM); free(*YDOM);
-		puts("Error reading the entries of YDOM:\n\n"
-		     "\tMust be provided the same number of rows as the number of regions in Y.");
+		// Error reading the entries of YDOM:\n\n"
+		// Must be provided the same number of rows as the number of regions in Y.");
 		return 2;
 	}
 
-    // ZONE MAPPING
-	*ZMAP = malloc(sizeof(int) * (*nyr) * (*nxr)); assert(*ZMAP != NULL);
+  // ZONE MAPPING
+	*ZMAP = malloc(sizeof(int) * (*nyr) * (*nxr));
+  if(*ZMAP == NULL){
+    free(*ZON); free(*XDOM); free(*YDOM); return 3;
+  }
 	int z, entry_z_count = 0;
   for (int yr = 0; yr < *nyr; yr++) {
 		for (int xr = 0; xr < *nxr; xr++) {
 			if (fscanf(cfPtr, "%d", &z) == 0) {
-				puts("Error reading input file!");
+				//Error reading input file!");
 				free(*ZON); free(*XDOM); free(*YDOM);
 				free(*ZMAP);
-                return 2;
+        return 2;
 			}
 			(*ZMAP)[yr * (*nxr) + xr] = z - 1;
 			entry_z_count = entry_z_count + 1;
@@ -220,32 +303,35 @@ int input_by_txt(int *N,             // Quadrature order
 	if (entry_z_count != (*nyr) * (*nxr)){
 		free(*ZON); free(*XDOM); free(*YDOM);
 		free(*ZMAP);
-		puts("Error reading the entries of ZMAP:\n\n"
-		     "\tThe entries in ZMAP don't match with the regions of the problem.");
+		// Error reading the entries of ZMAP:
+		// The entries in ZMAP don't match with the regions of the problem
 		return 2;
 	}
 
   // EXTERNAL SOURCE MAPPING
-	*QMAP = malloc(sizeof(double) * (*nyr) * (*nxr)); assert(*QMAP != NULL);
+	*QMAP = malloc(sizeof(long double) * (*nyr) * (*nxr)); 
+  if(*QMAP == NULL){
+    free(*ZON); free(*XDOM); free(*YDOM); free(*ZMAP); return 3;
+  }
 	double q;
 	int entry_q_count = 0;
   for (int yr = 0; yr < *nyr; yr++) {
 		for (int xr = 0; xr < *nxr; xr++) {
 			if (fscanf(cfPtr, "%lf", &q) == 0) {
-				puts("Error reading input file!");
+				// Error reading input file
 				free(*ZON); free(*XDOM); free(*YDOM);
 				free(*ZMAP); free(*QMAP);
-                return 2;
+        return 2;
 			}
-			(*QMAP)[yr * (*nxr) + xr] = q;
+			(*QMAP)[yr * (*nxr) + xr] = (long double)q;
 			entry_q_count = entry_q_count + 1;
 		}
   }
 	if (entry_q_count != (*nyr) * (*nxr)){
 		free(*ZON); free(*XDOM); free(*YDOM);
 		free(*ZMAP); free(*QMAP);
-		puts("Error reading the entries of QMAP:\n\n"
-		     "\tThe entries in QMAP don't match with the regions of the problem.");
+		// Error reading the entries of QMAP:
+		// The entries in QMAP don't match with the regions of the problem
 		return 2;
 	}
 
@@ -254,19 +340,19 @@ int input_by_txt(int *N,             // Quadrature order
 	int bc_count = 0;
 	for (int c = 0; c < 4; c++) {
 		if (fscanf(cfPtr, "%lf", &cond) == 0) {
-			puts("Error reading input file!");
+			// Error reading input file
 			free(*ZON); free(*XDOM); free(*YDOM);
 			free(*ZMAP); free(*QMAP);
-            return 2;
+      return 2;
 		}
-		BC[c] = cond;
+		BC[c] = (long double)cond;
 		bc_count = bc_count + 1;
 		if (cond < 0.0 ){
 			if (cond != -1.0){
 				free(*ZON); free(*XDOM); free(*YDOM);
-			    free(*ZMAP); free(*QMAP);
-				puts("Invalid boudary condition!\n\n"
-		     		"\tValue must be -1.0, 0.0, or a positive number.");
+			  free(*ZMAP); free(*QMAP);
+				// Invalid boudary condition:
+		    // Value must be -1.0, 0.0, or a positive number
 				return 2;
 			}
 		}
@@ -274,70 +360,59 @@ int input_by_txt(int *N,             // Quadrature order
 	if (bc_count != 4){
 		free(*ZON); free(*XDOM); free(*YDOM);
 		free(*ZMAP); free(*QMAP);
-		puts("The number of boundary conditions must be 4.\n\n");
+		// The number of boundary conditions must be 4
 		return 2;
 	}
 
   // TOLERANCE
-	if (fscanf(cfPtr, "%lf", tol) == 0) {
-		puts("Error reading input file!");
+  double dtol;
+	if (fscanf(cfPtr, "%lf", &dtol) == 0) {
+		// Error reading input file
 		free(*ZON); free(*XDOM); free(*YDOM);
 		free(*ZMAP); free(*QMAP);
-        return 2;
+    return 2;
 	}
-	if (*tol <= 0.0 || *tol >= 1.0){
+	if (dtol <= 0.0 || dtol >= 1.0){
 		free(*ZON); free(*XDOM); free(*YDOM);
 		free(*ZMAP); free(*QMAP);
-		puts("The tolerance (TOL) must be a small number between 0.0 and 1.0.\n\n");
+		// The tolerance (TOL) must be a small number between 0.0 and 1.0
 		return 2;
 	}
+  *tol = (long double)dtol;
 
 	fclose(cfPtr);
 
   return 0;
 }
-/////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
-
-/////////////////////////////////////////////////////////////// FREE MEMORY REQUESTED
-void free_memory(double **ZON, int **XDOM, int **YDOM, int **ZMAP, double **QMAP,
-                 double **MIU, double **THETA, double **CHI, double **W,
-				         double **MFLUX, double **MFLOW, double **XFLOW, double **YFLOW){
-
-  // INPUT VARIABLES
-  free(*ZON);     free(*XDOM);    free(*YDOM);    free(*ZMAP);    free(*QMAP);
-
-  // QUADRATURE VARIABLES
-  free(*MIU);     free(*THETA);   free(*CHI);     free(*W);
-
-	// PRINCIPAL VARIABLES
-	free(*MFLUX);	free(*MFLOW);	free(*XFLOW);	free(*YFLOW);
-}
-
-///////////////////////////////////////////////////////////////// GENERATE QUADRATURE
-void quad(int N,           // Quadrature order
-          double **MIU,    // Ordinates in X
-          double **THETA,  // Ordinates in Y
-          double **CHI,    // Ordinates in Z
-          double **W       // Weight
-          ){
+/////////////////////////////////////////////////////////// GENERATE QUADRATURE
+int quad(int N,                // Quadrature order
+         long double **MIU,    // Ordinates in X
+         long double **THETA,  // Ordinates in Y
+         long double **FI,     // Ordinate list
+         long double **W,      // Weight
+         long double **LIST    // Ordinate list
+         ){
     
   // DIRECTIONS IN THE XY PLANE
   int M = N * (N + 2) / 2;
   
   // ALLOCATE MEMORY FOR THE ORDINATES
-  *MIU = malloc(sizeof(double) * M); assert(*MIU != NULL);
-  *THETA = malloc(sizeof(double) * M); assert(*THETA != NULL);
-  *CHI = malloc(sizeof(double) * M); assert(*CHI != NULL);
-  *W = malloc(sizeof(double) * M); assert(*W != NULL);
+  *MIU = malloc(sizeof(long double) * M);
+  *THETA = malloc(sizeof(long double) * M);
+  *FI = malloc(sizeof(long double) * M);
+  *W = malloc(sizeof(long double) * M);
+  *LIST = malloc(sizeof(long double) * N / 2);
+  if (*MIU == NULL || *THETA == NULL || *FI == NULL || *W == NULL || *LIST == NULL) return 3;
 
   // PREFIXED VALUES
-  double chi[10] = { 0.0 }, wlist[10] = { 0.0 };
+  long double chi[10] = { 0.0 }, wlist[10] = { 0.0 };
 	if (N == 2) {
 		chi[0] = 0.5773502692; wlist[0] = 1.0;
 	}
 	else if (N == 4) {
-		chi[0] = 0.3500212; wlist[0] = (double)1/3;
+		chi[0] = 0.3500212; wlist[0] = (long double)1/3;
 		chi[1] = 0.8688903;
 	}
 	else if (N == 6) {
@@ -404,34 +479,34 @@ void quad(int N,           // Quadrature order
 		aux0 = 0;
 		for (int m = (nlevel - 1) - n; m >= 0; m--) {
 			(*MIU)[d] = chi[m]; (*THETA)[d] = chi[aux0]; 
-            (*CHI)[d] = chi[n]; (*W)[d] = 0.0;
+      (*FI)[d] = chi[n];  (*W)[d] = 0.0;
 			d = d + 1; aux0 = aux0 + 1;
 		}
 	}
 
   // WEIGHT FILLING
-	int p = 0; double aux1, aux2, aux3;
+	int p = 0; long double aux1, aux2, aux3;
 	for (int n = 0; n < M / 4; n++) {
 		if ((*W)[n] == 0.0) {
 			(*W)[n] = wlist[p];
-			aux1 = (*MIU)[n]; aux2 = (*THETA)[n]; aux3 = (*CHI)[n];
+			aux1 = (*MIU)[n]; aux2 = (*THETA)[n]; aux3 = (*FI)[n];
 			for (int m = 0; m < M / 4; m++) {
-				if (aux1 == (*THETA)[m] && aux2 == (*MIU)[m] && aux3 == (*CHI)[m]) {
+				if (aux1 == (*THETA)[m] && aux2 == (*MIU)[m] && aux3 == (*FI)[m]) {
 					(*W)[m] = wlist[p];
 				}
-				if (aux1 == (*THETA)[m] && aux2 == (*CHI)[m] && aux3 == (*MIU)[m]) {
+				if (aux1 == (*THETA)[m] && aux2 == (*FI)[m] && aux3 == (*MIU)[m]) {
 					(*W)[m] = wlist[p];
 				}
-				if (aux1 == (*CHI)[m] && aux2 == (*THETA)[m] && aux3 == (*MIU)[m]) {
+				if (aux1 == (*FI)[m] && aux2 == (*THETA)[m] && aux3 == (*MIU)[m]) {
 					(*W)[m] = wlist[p];
 				}
-				if (aux1 == (*CHI)[m] && aux2 == (*MIU)[m] && aux3 == (*THETA)[m]) {
+				if (aux1 == (*FI)[m] && aux2 == (*MIU)[m] && aux3 == (*THETA)[m]) {
 					(*W)[m] = wlist[p];
 				}
-				if (aux1 == (*MIU)[m] && aux2 == (*CHI)[m] && aux3 == (*THETA)[m]) {
+				if (aux1 == (*MIU)[m] && aux2 == (*FI)[m] && aux3 == (*THETA)[m]) {
 					(*W)[m] = wlist[p];
 				}
-				if (aux1 == (*MIU)[m] && aux2 == (*THETA)[m] && aux3 == (*CHI)[m]) {
+				if (aux1 == (*MIU)[m] && aux2 == (*THETA)[m] && aux3 == (*FI)[m]) {
 					(*W)[m] = wlist[p];
 				}
 			}
@@ -445,64 +520,71 @@ void quad(int N,           // Quadrature order
 		for (int m = 0; m < M / 4; m++) {
 			if (q == 2) {
 				(*MIU)[aux4] = -(*MIU)[m]; (*THETA)[aux4] = (*THETA)[m];
-				(*CHI)[aux4] = (*CHI)[m]; (*W)[aux4] = (*W)[m];
+				(*FI)[aux4] = (*FI)[m]; (*W)[aux4] = (*W)[m];
 			}
 			else if (q == 3) {
 				(*MIU)[aux4] = -(*MIU)[m]; (*THETA)[aux4] = -(*THETA)[m];
-				(*CHI)[aux4] = (*CHI)[m]; (*W)[aux4] = (*W)[m];
+				(*FI)[aux4] = (*FI)[m]; (*W)[aux4] = (*W)[m];
 			}
 			else if (q == 4) {
 				(*MIU)[aux4] = (*MIU)[m]; (*THETA)[aux4] = -(*THETA)[m];
-				(*CHI)[aux4] = (*CHI)[m]; (*W)[aux4] = (*W)[m];
+				(*FI)[aux4] = (*FI)[m]; (*W)[aux4] = (*W)[m];
 			}
 			aux4 = aux4 + 1;
 		}
 	}
+
+  // ORDINATE LIST FILL
+  for (int i = 0; i < N / 2; i++){
+    (*LIST)[i] = chi[i];
+  }
+
+  return 0;
     
 }
+///////////////////////////////////////////////////////////////////////////////
 
-/////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////// RM_CN ITERATIVE SCHEME
+int dd (int N,               // Quadrature order
+        int nz,              // Number of zones
+        long double ZON[],   // Zone entries
+        int nxr,             // Number of regions in X
+        long double XDOM[],  // X Region entries
+        int nyr,             // Number of regions in Y
+        long double YDOM[],  // Y Region entries
+        int ZMAP[],          // Zone map
+        long double QMAP[],  // External source map
+        long double BC[],    // Boundary conditions
+        long double tol,     // Tolerance
+        long double MIU[],   // Ordinate in X
+        long double THETA[], // Ordinate in Y
+        long double W[],     // Quadrature weight
+        long double **MFLUX, // Escalar flux in the nodes
+        long double **MFLOW, // Angular flux in the nodes
+        long double **XFLOW, // Angular flux at the y edges
+        long double **YFLOW, // Angular flux at the x edges
+        int *ITER,            // Iteration
+        long double *cpu_time // CPU time
+        ){
 
-/////////////////////////////////////////////////////////////////////////////////////   METODO DD_2D
-
-/* Implementation of the Diamond Difference method for monoenergetic neutron transport problems   */ 
-/* with fixed source, isotropic scattering and in xy geometry.                                    */
-
-void dd_2d(int N,          // Quadrature order
-           int nz,         // Number of zones
-           double ZON[],   // Zone entries
-           int nxr,        // Number of regions in X
-           int XDOM[],     // X Region entries
-           int nyr,        // Number of regions in Y
-           int YDOM[],     // Y Region entries
-           int ZMAP[],     // Zone map
-           double QMAP[],  // External source map
-           double BC[],    // Boundary conditions
-           double tol,     // Tolerance
-           double MIU[],   // Ordinates in X
-           double THETA[], // Ordinates in Y
-           double W[],     // Weight
-           double **MFLUX, // Escalar flux in the nodes
-           double **MFLOW, // Angular flux in the nodes
-           double **XFLOW, // Angular flux at the y edges
-           double **YFLOW  // Angular flux at the x edges
-           ){
-    
   // INITIALIZATION
   int ntc_x = 0, ntc_y = 0;
   for (int rx = 0; rx < nxr; rx++) {
-		ntc_x = ntc_x + XDOM[2*rx + 1];
+		ntc_x = ntc_x + (int)XDOM[2*rx + 1];
 	}
 	for (int ry = 0; ry < nyr; ry++) {
-		ntc_y = ntc_y + YDOM[2 * ry + 1];
+		ntc_y = ntc_y + (int)YDOM[2 * ry + 1];
 	}
   int M = N * (N + 2) / 2;
-  double *S = NULL;      // Source term
-  S = malloc(sizeof(double) * (ntc_y * ntc_x)); assert(S != NULL);
-  *MFLUX = malloc(sizeof(double) * (ntc_y * ntc_x)); assert(*MFLUX != NULL);
-	*MFLOW = malloc(sizeof(double) * (ntc_y * ntc_x) * M); assert(*MFLOW != NULL);
-	*XFLOW = malloc(sizeof(double) * (ntc_y * (ntc_x + 1)) * M); assert(*XFLOW != NULL);
-	*YFLOW = malloc(sizeof(double) * ((ntc_y + 1) * ntc_x) * M); assert(*YFLOW != NULL);
+  long double *S = NULL;
+  S = malloc(sizeof(long double) * (ntc_y * ntc_x));
+  *MFLUX = malloc(sizeof(long double) * (ntc_y * ntc_x));
+	*MFLOW = malloc(sizeof(long double) * (ntc_y * ntc_x) * M);
+	*XFLOW = malloc(sizeof(long double) * (ntc_y * (ntc_x + 1)) * M);
+	*YFLOW = malloc(sizeof(long double) * ((ntc_y + 1) * ntc_x) * M);
+  if (*MFLUX == NULL || *MFLOW == NULL || *XFLOW == NULL || *YFLOW == NULL || S == NULL){
+    if (S != NULL) free(S); return 3;
+  }
   for (int j = 0; j < ntc_y; j++) {
 		for (int i = 0; i < ntc_x; i++) {
 			S[ntc_x * j + i] = 0.0; (*MFLUX)[ntc_x * j + i] = 0.0;
@@ -538,29 +620,33 @@ void dd_2d(int N,          // Quadrature order
 		}
 	}
 
+  // VARIABLES
+  clock_t start, end;
+  long double ERR = 1.0;
+
   // ITERATIVE PROCESS
-  double ERR = 1.0;
-	int ITER = -1;
-  while (ERR > tol) {
-    ERR = 0.0; ITER = ITER + 1;
+  printf("\n3. ITERATIVE PROCESS:\n\n");
+	printf("ITER\tMAX_ERR (MFLUX)\n");
+  start = clock(); *ITER = -1;
+  while (ERR > tol && *ITER < 10000){
+    ERR = 0.0; *ITER = *ITER + 1;
 
     for (int m = 0; m < M; m++){
 
-      // 1. SE - > NW SWEEP
+      // 1. SW - > NE SWEEP
       if (m < M / 4) {
-				int j_b = 0, j_f = j_b + 1, i_b = 0, i_f = i_b + 1;
-				int nc_y, len_y, nc_x, len_x, z;
-				double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q;
-				double mflow, xflow, yflow;
+				int j_b = 0, j_f = j_b + 1, i_b = 0, i_f = i_b + 1, nc_y, nc_x, z;
+				long double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q, len_y, len_x;
+				long double mflow, xflow, yflow;
 				miu = MIU[m]; theta = THETA[m];
 				for (int ry = 0; ry < nyr; ry++) {
-					len_y = YDOM[2 * ry];                  nc_y = YDOM[2 * ry + 1]; 
-					h_y = (double)len_y / nc_y;
+					len_y = YDOM[2 * ry];                  nc_y = (int)YDOM[2 * ry + 1]; 
+					h_y = (long double)(len_y / nc_y);
 					for (int j = 0; j < nc_y; j++) {
 						i_b = 0; i_f = i_b + 1;
 						for (int rx = 0; rx < nxr; rx++) {
-							len_x = XDOM[2 * rx];          nc_x = XDOM[2 * rx + 1]; 
-							h_x = (double)len_x / nc_x;    z = ZMAP[nxr * ry + rx];
+							len_x = XDOM[2 * rx];          nc_x = (int)XDOM[2 * rx + 1]; 
+							h_x = (long double)(len_x / nc_x);    z = ZMAP[nxr * ry + rx];
 							q = QMAP[nxr * ry + rx];       st = ZON[2 * z];
 							alfa_x = fabs(h_x * st / miu); alfa_y = fabs(h_y * st / theta);
 							for (int i = 0; i < nc_x; i++) {
@@ -582,19 +668,18 @@ void dd_2d(int N,          // Quadrature order
 
       // 2. SE -> NW SWEEP
       else if (m >= M / 4 && m < M / 2) {
-				int j_b = 0, j_f = j_b + 1, i_b = ntc_x - 1, i_f = i_b + 1;
-				int nc_y, len_y, nc_x, len_x, z;
-				double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q;
-				double mflow, xflow, yflow;
+				int j_b = 0, j_f = j_b + 1, i_b = ntc_x - 1, i_f = i_b + 1, nc_y, nc_x, z;
+				long double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q, len_y, len_x;
+				long double mflow, xflow, yflow;
 				miu = MIU[m]; theta = THETA[m];
 				for (int ry = 0; ry < nyr; ry++) {
-					len_y = YDOM[2 * ry];                  nc_y = YDOM[2 * ry + 1];
-					h_y = (double)len_y / nc_y;
+					len_y = YDOM[2 * ry];                  nc_y = (int)YDOM[2 * ry + 1];
+					h_y = (long double)(len_y / nc_y);
 					for (int j = 0; j < nc_y; j++) {
 						i_b = ntc_x - 1; i_f = i_b + 1;
 						for (int rx = nxr-1; rx >= 0; rx--) {
-							len_x = XDOM[2 * rx];          nc_x = XDOM[2 * rx + 1];
-							h_x = (double)len_x / nc_x;    z = ZMAP[nxr * ry + rx];
+							len_x = XDOM[2 * rx];          nc_x = (int)XDOM[2 * rx + 1];
+							h_x = (long double)(len_x / nc_x);    z = ZMAP[nxr * ry + rx];
 							q = QMAP[nxr * ry + rx];       st = ZON[2 * z];
 							alfa_x = fabs(h_x * st / miu); alfa_y = fabs(h_y * st / theta);
 							for (int i = 0; i < nc_x; i++) {
@@ -616,19 +701,18 @@ void dd_2d(int N,          // Quadrature order
 
       // 3. NE -> SW SWEEP
       else if (m >= M / 2 && m < 3 * M / 4) {
-				int j_b = ntc_y - 1, j_f = j_b + 1, i_b = ntc_x - 1, i_f = i_b + 1;
-				int nc_y, len_y, nc_x, len_x, z;
-				double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q;
-				double mflow, xflow, yflow;
+				int j_b = ntc_y - 1, j_f = j_b + 1, i_b = ntc_x - 1, i_f = i_b + 1, nc_y, nc_x, z;
+				long double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q, len_y, len_x;
+				long double mflow, xflow, yflow;
 				miu = MIU[m]; theta = THETA[m];
 				for (int ry = nyr-1; ry >= 0; ry--) {
-					len_y = YDOM[2 * ry];                  nc_y = YDOM[2 * ry + 1];
-					h_y = (double)len_y / nc_y;
+					len_y = YDOM[2 * ry];                  nc_y = (int)YDOM[2 * ry + 1];
+					h_y = (long double)(len_y / nc_y);
 					for (int j = 0; j < nc_y; j++) {
 						i_b = ntc_x - 1; i_f = i_b + 1;
 						for (int rx = nxr - 1; rx >= 0; rx--) {
-							len_x = XDOM[2 * rx];          nc_x = XDOM[2 * rx + 1];
-							h_x = (double)len_x / nc_x;    z = ZMAP[nxr * ry + rx];
+							len_x = XDOM[2 * rx];          nc_x = (int)XDOM[2 * rx + 1];
+							h_x = (long double)(len_x / nc_x);    z = ZMAP[nxr * ry + rx];
 							q = QMAP[nxr * ry + rx];       st = ZON[2 * z];
 							alfa_x = fabs(h_x * st / miu); alfa_y = fabs(h_y * st / theta);
 							for (int i = 0; i < nc_x; i++) {
@@ -650,19 +734,18 @@ void dd_2d(int N,          // Quadrature order
 
       // 4. NW -> SE SWEEP
       else if (m >= 3 * M / 4 && m < M) {
-			  int j_b = ntc_y - 1, j_f = j_b + 1, i_b = 0, i_f = i_b + 1;
-			  int nc_y, len_y, nc_x, len_x, z;
-				double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q;
-				double mflow, xflow, yflow;
+			  int j_b = ntc_y - 1, j_f = j_b + 1, i_b = 0, i_f = i_b + 1, nc_y, nc_x, z;
+				long double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q, len_y, len_x;
+				long double mflow, xflow, yflow;
 			  miu = MIU[m]; theta = THETA[m];
 			  for (int ry = nyr - 1; ry >= 0; ry--) {
-				  len_y = YDOM[2 * ry];                  nc_y = YDOM[2 * ry + 1];
-				  h_y = (double)len_y / nc_y;
+				  len_y = YDOM[2 * ry];                  nc_y = (int)YDOM[2 * ry + 1];
+				  h_y = (long double)(len_y / nc_y);
 				  for (int j = 0; j < nc_y; j++) {
 					  i_b = 0; i_f = i_b + 1;
 					  for (int rx = 0; rx < nxr; rx++) {
-						  len_x = XDOM[2 * rx];          nc_x = XDOM[2 * rx + 1];
-						  h_x = (double)len_x / nc_x;    z = ZMAP[nxr * ry + rx];
+						  len_x = XDOM[2 * rx];          nc_x = (int)XDOM[2 * rx + 1];
+						  h_x = (long double)(len_x / nc_x);    z = ZMAP[nxr * ry + rx];
 							q = QMAP[nxr * ry + rx];       st = ZON[2 * z];
 						  alfa_x = fabs(h_x * st / miu); alfa_y = fabs(h_y * st / theta);
 						  for (int i = 0; i < nc_x; i++) {
@@ -686,7 +769,7 @@ void dd_2d(int N,          // Quadrature order
     // REFLECTIVE BOUNDARY CONDITIONS
 		int j_b = 0, nc_y;
 		for (int ry = 0; ry < nyr; ry++) {
-			nc_y = YDOM[2 * ry + 1];
+			nc_y = (int)YDOM[2 * ry + 1];
 			for (int j = 0; j < nc_y; j++) {
 				for (int m = 0; m < M/4; m++) {
 					if (BC[0] == -1.0) {
@@ -703,7 +786,7 @@ void dd_2d(int N,          // Quadrature order
 		}
 		int i_b = 0, nc_x;
 		for (int rx = 0; rx < nxr; rx++) {
-			nc_x = XDOM[2 * rx + 1];
+			nc_x = (int)XDOM[2 * rx + 1];
 			for (int i = 0; i < nc_x; i++) {
 				for (int m = 0; m < M / 4; m++) {
 					if (BC[1] == -1.0) {
@@ -720,15 +803,15 @@ void dd_2d(int N,          // Quadrature order
 		}
 
     // SCALAR FLUX, SOURCE TERM AND STOP CRITERIA
-		double faux, mflux, w, st, ss;
+		long double faux, mflux, w, st, ss;
 		int z;
 		j_b = 0;
 		for (int ry = 0; ry < nyr; ry++) {
-			nc_y = YDOM[2 * ry + 1];
+			nc_y = (int)YDOM[2 * ry + 1];
 			for (int j = 0; j < nc_y; j++) {
 				i_b = 0;
 				for (int rx = 0; rx < nxr; rx++) {
-					nc_x = XDOM[2 * rx + 1];       z = ZMAP[nxr * ry + rx];
+					nc_x = (int)XDOM[2 * rx + 1];       z = ZMAP[nxr * ry + rx];
 					st = ZON[2 * z];               ss = ZON[2 * z + 1];
 					for (int i = 0; i < nc_x; i++) {
 						faux = (*MFLUX)[ntc_x * j_b + i_b]; mflux = 0.0;
@@ -748,168 +831,388 @@ void dd_2d(int N,          // Quadrature order
 				j_b = j_b + 1;
 			}
 		}
+
+    printf("%d\t%.5Le\n", *ITER, ERR);
   }
+  end = clock();
+  *cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
+  printf("CPU TIME = %.5Le\n\n", *cpu_time);
 
-	// FREE MEMORY
-	free(S);
+  if (S != NULL) free(S);
+
+  if (*ITER >= 10000) return 5;
+  return 0;
+
 }
-////////////////////////////////////////////////////////////////////////////////////////////////////
 
-///////////////////////////////////////////////////////////////////// POST PROCESSING
+///////////////////////////////////////////////////////////////////////////////
 
-void post_processing(int N,          // Quadrature order
-                     int nz,         // Number of zones
-                     double ZON[],   // Zone entries
-                     int nxr,        // Number of regions in X
-                     int XDOM[],     // X Region entries
-                     int nyr,        // Number of regions in Y
-                     int YDOM[],     // Y Region entries
-                     int ZMAP[],     // Zone map
-                     double QMAP[],  // External source map
-                     double BC[],    // Boundary conditions
-                     double MIU[],   // Ordinates in X
-                     double THETA[], // Ordinates in Y
-                     double W[],     // Weight
-	                 double MFLUX[], // Escalar flux in the nodes
-                     double MFLOW[], // Angular flux in the nodes
-                     double XFLOW[], // Angular flux at the y edges
-                     double YFLOW[]  // Angular flux at the x edges
+////////////////////////////////////////////////////////// AUXILIARY FUNCTIONS
+void print_problem(int N,           // Quadrature order
+                   int nz,          // Number of zones
+                   long double ZON[],    // Zone entries
+                   int nxr,         // Number of regions in X
+                   long double XDOM[],      // X Region entries
+                   int nyr,         // Number of regions in Y
+                   long double YDOM[],      // Y Region entries
+                   int ZMAP[],      // Zone map
+                   long double QMAP[],   // External source map
+                   long double BC[],     // Boundary conditions
+                   long double tol      // Tolerance
+                  ){
+
+  printf("\n1. PROBLEM SETUP:\n\n");
+
+  // QUADRATURE ORDER
+  printf("N = %d\n\n", N);
+
+  // NUMBER OF ZONES
+  printf("NZ = %d\n\n", nz);
+
+  // ZONE ENTRIES
+	printf("ZON:\n");
+  printf("NO.\tS_T\tS_S\n");
+  for (int z = 0; z < nz; z++){
+      printf("%d\t%.4Lf\t%.4Lf\n", z+1, ZON[z*2], ZON[z*2 + 1]);
+  }
+  printf("\n");
+
+  // NUMBER OF REGIONS IN X
+  printf("NR_X = %d\n\n", nxr);
+
+  // REGION ENTRIES IN X
+	printf("XDOM:\n");
+  printf("No.\tLEN\tNODES\n");
+  for (int xr = 0; xr < nxr; xr++){
+      printf("%d\t%.2Lf\t%d\n", xr + 1, XDOM[xr * 2], (int)XDOM[xr * 2 + 1]);
+  }
+  printf("\n");
+
+  // NUMBER OF REGIONS IN Y
+  printf("NR_Y = %d\n\n", nyr);
+
+  // REGION ENTRIES IN Y
+	printf("YDOM:\n");
+  printf("NO.\tLEN\tNODES\n");
+  for (int yr = 0; yr < nyr; yr++){
+      printf("%d\t%.2Lf\t%d\n", yr + 1, YDOM[yr * 2], (int)YDOM[yr * 2 + 1]);
+  }
+  printf("\n");
+
+  // ZONE MAPPING
+  printf("ZMAP:\n");
+  for (int yr = 0; yr < nyr; yr++) {
+		for (int xr = 0; xr < nxr; xr++) {
+			printf("%d\t", ZMAP[yr * nxr + xr] + 1);
+		}
+		printf("\n");
+  }
+  printf("\n");
+
+  // EXTERNAL SOURCE MAPPING
+  printf("Q_MAP:\n");
+  for (int yr = 0; yr < nyr; yr++) {
+		for (int xr = 0; xr < nxr; xr++) {
+			printf("%.4Lf\t", QMAP[yr * nxr + xr]);
+		}
+		printf("\n");
+  }
+  printf("\n");
+
+  // BOUNDARY CONDITIONS
+	printf("BOUNDARY_CONDITIONS =\n");
+	for (int c = 0; c < 4; c++) {
+		printf("%d. ", c + 1);
+		if (BC[c] == 0.0) printf("Vacuum\n");
+		else if (BC[c] == -1.0) printf("Reflective\n");
+    else printf("Isotropic %.2f\n", BC[c]);
+	}
+	printf("\n");
+
+  // TOLERANCE
+	printf("TOL = %.4Le\n\n", tol);
+
+}
+
+
+void post_processing(int N,               // Quadrature order
+                     int nz,              // Number of zones
+                     long double ZON[],   // Zone entries
+                     int nxr,             // Number of regions in X
+                     long double XDOM[],  // X Region entries
+                     int nyr,             // Number of regions in Y
+                     long double YDOM[],  // Y Region entries
+                     int ZMAP[],          // Zone map
+                     long double QMAP[],  // External source map
+                     long double BC[],    // Boundary conditions
+                     long double MIU[],   // Ordinates in X
+                     long double THETA[], // Ordinates in Y
+                     long double W[],
+	                   long double MFLUX[], // Scalar flux in the nodes
+                     long double MFLOW[], // Angular flux in the nodes
+                     long double XFLOW[], // Angular flux at the y edges
+                     long double YFLOW[]  // Angular flux at the x edges
 					 ){
 	
 	// INICIALIZATION
 	int j_b = 0, i_b = 0, j_f, i_f, ntc_x = 0, ntc_y = 0;;
-	int len_y, nc_y, len_x, nc_x, z;
-	double h_y, h_x, area_r, sa, miu, theta, w;
+	int nc_y, nc_x, z;
+	long double h_y, h_x, area_r, sa, miu, theta, w, len_y, len_x;
+	long double *MFLUX_R = NULL, *ABS_R = NULL, FUGA[4] = {0.0};
+	MFLUX_R = malloc(sizeof(long double)*nyr*nxr); assert(MFLUX_R != NULL);
+	ABS_R = malloc(sizeof(long double)*nyr*nxr); assert(ABS_R != NULL);
+	for (int ry = 0; ry < nyr; ry++) {
+		for (int rx = 0; rx < nxr; rx++) {
+			MFLUX_R[nxr*ry + rx] = 0.0;
+			ABS_R[nxr*ry + rx] = 0.0;
+		}
+	}
   for (int rx = 0; rx < nxr; rx++) {
-		ntc_x = ntc_x + XDOM[2*rx + 1];
+		ntc_x = ntc_x + (int)XDOM[2*rx + 1];
 	}
 	for (int ry = 0; ry < nyr; ry++) {
-		ntc_y = ntc_y + YDOM[2 * ry + 1];
+		ntc_y = ntc_y + (int)YDOM[2 * ry + 1];
 	}
   int M = N * (N + 2) / 2;
 
-	// MFLUX
-  printf("{\n\"MFLUX\": [\n");
+	// CALCULATION OF MFLUX and ABS_R
+  j_b = 0;
 	for(int ry = 0; ry < nyr; ry++){
-		len_y = YDOM[2*ry]; nc_y = YDOM[2*ry + 1]; h_y = (double)len_y/nc_y;
+		len_y = YDOM[2*ry]; nc_y = (int)YDOM[2*ry + 1]; h_y = (long double)len_y/nc_y;
 		for(int j = 0; j < nc_y; j++){
 			i_b = 0;
-      printf("[");
 			for(int rx = 0; rx < nxr; rx++){
-				len_x = XDOM[2*rx]; nc_x = XDOM[2*rx + 1]; h_x = (double)len_x/nc_x; 
-				area_r = (double)len_y*len_x; z = ZMAP[nxr*ry + rx];
+				len_x = XDOM[2*rx]; nc_x = (int)XDOM[2*rx + 1]; h_x = (long double)len_x/nc_x; 
+				area_r = len_y*len_x; z = ZMAP[nxr*ry + rx];
 				sa = ZON[2*z] - ZON[2*z + 1];
 				for(int i = 0; i < nc_x; i++){
-          if (i_b == ntc_x - 1) {
-						if (j_b == ntc_y - 1) printf(" %.10e ]\n", MFLUX[ntc_x*j_b + i_b]);
-						else printf(" %.10e ],\n", MFLUX[ntc_x*j_b + i_b]);
-					}
-          else printf(" %.10e,", MFLUX[ntc_x*j_b + i_b]);
-          i_b = i_b + 1;
+					MFLUX_R[nxr*ry + rx] = MFLUX_R[nxr*ry + rx] + h_y*h_x*MFLUX[ntc_x*j_b + i_b]/area_r;
+					ABS_R[nxr*ry + rx] = ABS_R[nxr*ry + rx] + sa*h_y*h_x*MFLUX[ntc_x*j_b + i_b];
+					i_b = i_b + 1;
 				}
 			}
 			j_b = j_b + 1;
 		}
 	}
-  printf("],\n");
 
-  // MFLOW
-  printf("\"MFLOW\": [\n");
-  for (int m = 0; m < M; m++){
+	// CALCULATION OF THE LEAKAGE FROM THE LEFT AND THE RIGHT BOUNDARIES
+	j_b = 0;
+	for(int ry = 0; ry < nyr; ry++){
+		len_y = YDOM[2*ry]; nc_y = (int)YDOM[2*ry + 1]; h_y = (long double)len_y/nc_y;
+		for(int j = 0; j < nc_y; j++){
+			// LEFT
+			for (int m = M/4; m < 3*M/4; m++){
+				miu = MIU[m]; w = W[m];	                          
+				FUGA[0] = FUGA[0] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + 0) + m];
+			}
+			// RIGHT
+			for (int m = 0; m < M/4; m++){
+				miu = MIU[m]; w = W[m];		                          
+				FUGA[2] = FUGA[2] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + m];
+			}
+			for (int m = 3*M/4; m < M; m++){
+				miu = MIU[m]; w = W[m];		                          
+				FUGA[2] = FUGA[2] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + m];
+			}                         
+			j_b = j_b + 1;
+		}
+	}
+
+	// CALCULATION OF THE LEAKAGE FROM THE BOTTOM AND THE TOP BOUNDARIES
+	i_b = 0;
+	for(int rx = 0; rx < nxr; rx++){
+		len_x = XDOM[2*rx]; nc_x = (int)XDOM[2*rx + 1]; h_x = (long double)len_x/nc_x;
+		for(int i = 0; i < nc_x; i++){
+			for (int m = M/2; m < M; m++){
+				theta = THETA[m]; w = W[m];   	
+				FUGA[1] = FUGA[1] + 0.5*h_x*w*theta*YFLOW[M * (ntc_x * 0 + i_b) + m];
+			}
+			for (int m = 0; m < M/2; m++){
+				theta = THETA[m]; w = W[m];
+				FUGA[3] = FUGA[3] + 0.5*h_x*w*theta*YFLOW[M * (ntc_x * ntc_y + i_b) + m];
+			}
+			i_b = i_b + 1;
+		}
+	}
+
+	// PRINT POST PROCESSING
+	printf("\n\n4. POST - PROCESSING:\n\n");
+
+	// SCALAR FLUX PER REGION
+	printf("SCALAR FLUX PER REGION =\n");
+	for (int rx = 0; rx < nxr; rx++) {
+		printf("\tRX_%d\t", rx + 1);
+	}
+	printf("\n");
+	for (int ry = 0; ry < nyr; ry++) {
+		printf("RY_%d\t", ry + 1);
+		for (int rx = 0; rx < nxr; rx++) {
+			printf("% .5Le\t", MFLUX_R[nxr * ry + rx]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	// ABSORPTION RATE PER REGION
+	printf("ABSORPTION RATE PER REGION =\n");
+	for (int rx = 0; rx < nxr; rx++) {
+		printf("\tRX_%d\t", rx + 1);
+	}
+	printf("\n");
+	for (int ry = 0; ry < nyr; ry++) {
+		printf("RY_%d\t", ry + 1);
+		for (int rx = 0; rx < nxr; rx++) {
+			printf("% .5Le\t", ABS_R[nxr * ry + rx]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	// LEAKAGE
+  printf("LEAKAGE =\n");
+	printf("LEFT\t\tBOTTOM\t\tRIGHT\t\tTOP\n");
+  for(int i = 0; i < 4; i++){
+    if (BC[i] == -1.0) printf("-\t\t");
+		else printf("%.4Le\t", FUGA[i]);
+	}
+	printf("\n\n");
+	
+	free(MFLUX_R); free(ABS_R);
+
+}
+
+
+void json_output(int N,               // Quadrature order
+                 int nxr,             // Number of regions in X
+                 long double XDOM[],  // X Region entries
+                 int nyr,             // Number of regions in Y
+                 long double YDOM[],  // Y Region entries
+                 int status,          // Status
+                 int ITER,            // Iterations
+                 long double cpu_time,// CPU time
+	               long double MFLUX[], // Scalar flux in the nodes
+                 long double MFLOW[], // Angular flux in the nodes
+                 long double XFLOW[], // Angular flux at the y edges
+                 long double YFLOW[]  // Angular flux at the x edges
+					 ){
+	
+	// INICIALIZATION
+	int j_b = 0, i_b = 0, j_f, i_f, ntc_x = 0, ntc_y = 0;;
+	int nc_y, nc_x;
+  for (int rx = 0; rx < nxr; rx++) {
+		ntc_x = ntc_x + (int)XDOM[2*rx + 1];
+	}
+	for (int ry = 0; ry < nyr; ry++) {
+		ntc_y = ntc_y + (int)YDOM[2 * ry + 1];
+	}
+  int M = N * (N + 2) / 2;
+
+  // STATUS
+  printf("{\n\"STATUS\": %d", status);
+
+  if (status != 0) printf("\n}\n");
+  else {
+
+    // ITERATIONS
+    printf(",\n\"ITER\": %d,\n", ITER);
+
+    // CPU TIME
+    printf("\"CPU\": %.10Le,\n", cpu_time);
+
+    // MFLUX
+    printf("\"MFLUX\": [\n");
     j_b = 0;
-    printf("[\n");
     for(int ry = 0; ry < nyr; ry++){
-		  len_y = YDOM[2*ry]; nc_y = YDOM[2*ry + 1];
-		  for(int j = 0; j < nc_y; j++){
-			  i_b = 0;
+      nc_y = (int)YDOM[2*ry + 1];
+      for(int j = 0; j < nc_y; j++){
+        i_b = 0;
         printf("[");
-			  for(int rx = 0; rx < nxr; rx++){
-				  len_x = XDOM[2*rx]; nc_x = XDOM[2*rx + 1];
-				  for(int i = 0; i < nc_x; i++){
+        for(int rx = 0; rx < nxr; rx++){
+          nc_x = (int)XDOM[2*rx + 1];
+          for(int i = 0; i < nc_x; i++){
             if (i_b == ntc_x - 1) {
-							if (j_b == ntc_y - 1) printf(" %.10e ]\n", MFLOW[M * (ntc_x * j_b + i_b) + m]);
-							else printf(" %.10e ],\n", MFLOW[M * (ntc_x * j_b + i_b) + m]);
-						}
-            else printf(" %.10e,", MFLOW[M * (ntc_x * j_b + i_b) + m]);
+              if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLUX[ntc_x*j_b + i_b]);
+              else printf(" %.10Le ],\n", MFLUX[ntc_x*j_b + i_b]);
+            }
+            else printf(" %.10Le,", MFLUX[ntc_x*j_b + i_b]);
             i_b = i_b + 1;
-				  }
-			  }
-			  j_b = j_b + 1;
-		  }
-	  }
-		if (m == M-1) printf("]\n");
-    else printf("],\n");
-  }
-  printf("],\n");
-
-  // XFLOW
-  printf("\"XFLOW\": [\n");
-  for (int m = 0; m < M; m++){
-    j_b = 0;
-    printf("[\n");
-    for(int ry = 0; ry < nyr; ry++){
-		  len_y = YDOM[2*ry]; nc_y = YDOM[2*ry + 1];
-		  for(int j = 0; j < nc_y; j++){
-			  i_b = 0;
-        printf("[");
-			  for(int rx = 0; rx < nxr; rx++){
-				  len_x = XDOM[2*rx]; nc_x = XDOM[2*rx + 1];
-				  for(int i = 0; i < nc_x; i++){
-            printf(" %.10e,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
-            i_b = i_b + 1;
-				  }
-			  }
-        if (i_b == ntc_x) {
-					if (j_b == ntc_y - 1) printf(" %.10e ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
-					else printf(" %.10e ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
-				}
-			  j_b = j_b + 1;
-		  }
-	  }
-    if (m == M-1) printf("]\n");
-    else printf("],\n");
-  }
-  printf("],\n");
-
-  // YFLOW
-  printf("\"YFLOW\": [\n");
-  for (int m = 0; m < M; m++){
-    j_b = 0;
-    printf("[\n");
-    for(int ry = 0; ry < nyr; ry++){
-		  len_y = YDOM[2*ry]; nc_y = YDOM[2*ry + 1];
-		  for(int j = 0; j < nc_y; j++){
-			  i_b = 0;
-        printf("[");
-			  for(int rx = 0; rx < nxr; rx++){
-				  len_x = XDOM[2*rx]; nc_x = XDOM[2*rx + 1];
-				  for(int i = 0; i < nc_x; i++){
-            if (i_b == ntc_x - 1) printf(" %.10e ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-            else printf(" %.10e,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-            i_b = i_b + 1;
-				  }
-			  }
-			  j_b = j_b + 1;
-		  }
-	  }
-    if (j_b == ntc_y){
-      i_b = 0;
-      printf("[");
-      for(int rx = 0; rx < nxr; rx++){
-        len_x = XDOM[2*rx]; nc_x = XDOM[2*rx + 1];
-        for(int i = 0; i < nc_x; i++){
-          if (i_b == ntc_x - 1) printf(" %.10e ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-          else printf(" %.10e,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-          i_b = i_b + 1;
+          }
         }
+        j_b = j_b + 1;
       }
     }
-    if (m == M-1) printf("]\n");
-    else printf("],\n");
+    printf("],\n");
+
+    // XFLOW
+    printf("\"XFLOW\": [\n");
+    for (int m = 0; m < M; m++){
+      j_b = 0;
+      printf("[\n");
+      for(int ry = 0; ry < nyr; ry++){
+        nc_y = (int)YDOM[2*ry + 1];
+        for(int j = 0; j < nc_y; j++){
+          i_b = 0;
+          printf("[");
+          for(int rx = 0; rx < nxr; rx++){
+            nc_x = (int)XDOM[2*rx + 1];
+            for(int i = 0; i < nc_x; i++){
+              printf(" %.10Le,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+              i_b = i_b + 1;
+            }
+          }
+          if (i_b == ntc_x) {
+            if (j_b == ntc_y - 1) printf(" %.10Le ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+            else printf(" %.10Le ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+          }
+          j_b = j_b + 1;
+        }
+      }
+      if (m == M-1) printf("]\n");
+      else printf("],\n");
+    }
+    printf("],\n");
+
+    // YFLOW
+    printf("\"YFLOW\": [\n");
+    for (int m = 0; m < M; m++){
+      j_b = 0;
+      printf("[\n");
+      for(int ry = 0; ry < nyr; ry++){
+        nc_y = (int)YDOM[2*ry + 1];
+        for(int j = 0; j < nc_y; j++){
+          i_b = 0;
+          printf("[");
+          for(int rx = 0; rx < nxr; rx++){
+            nc_x = (int)XDOM[2*rx + 1];
+            for(int i = 0; i < nc_x; i++){
+              if (i_b == ntc_x - 1) printf(" %.10Le ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+              else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+              i_b = i_b + 1;
+            }
+          }
+          j_b = j_b + 1;
+        }
+      }
+      if (j_b == ntc_y){
+        i_b = 0;
+        printf("[");
+        for(int rx = 0; rx < nxr; rx++){
+          nc_x = (int)XDOM[2*rx + 1];
+          for(int i = 0; i < nc_x; i++){
+            if (i_b == ntc_x - 1) printf(" %.10Le ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+            else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+            i_b = i_b + 1;
+          }
+        }
+      }
+      if (m == M-1) printf("]\n");
+      else printf("],\n");
+    }
+    printf("]\n");
+
+    printf("}\n");
   }
-  printf("]\n");
 
-
-  printf("}\n");
 }
-/////////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////////////////////
