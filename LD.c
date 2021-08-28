@@ -18,7 +18,7 @@ int input_by_txt(int *N, int *nz, long double **ZON, int *nxr, long double **XDO
 int quad(int N, long double **MIU, long double **THETA, long double **CHI, long double **W, long double **LIST);
 
 /////////////////////////////////////////////////////////// DD ITERATIVE SCHEME
-int step (int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol, long double MIU[], long double THETA[], long double W[], long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW, int *ITER, long double *cpu_time);
+int ld (int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol, long double MIU[], long double THETA[], long double W[], long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW, int *ITER, long double *cpu_time);
 
 ////////////////////////////////////////////////////////// AUXILIARY FUNCTIONS
 void print_problem(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double tol);
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]){
 	printf("\n");
 
   // ITERATIVE SCHEME
-  status = step (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, MIU, THETA, W, &MFLUX, &MFLOW, &XFLOW, &YFLOW, &ITER, &cpu_time);
+  status = ld (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, MIU, THETA, W, &MFLUX, &MFLOW, &XFLOW, &YFLOW, &ITER, &cpu_time);
   if (status != 0){
     json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
     free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
@@ -545,7 +545,7 @@ int quad(int N,                // Quadrature order
 ///////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////// RM_CN ITERATIVE SCHEME
-int step (int N,               // Quadrature order
+int ld (int N,               // Quadrature order
         int nz,              // Number of zones
         long double ZON[],   // Zone entries
         int nxr,             // Number of regions in X
@@ -576,20 +576,29 @@ int step (int N,               // Quadrature order
 		ntc_y = ntc_y + (int)YDOM[2 * ry + 1];
 	}
   int M = N * (N + 2) / 2;
-  long double *S = NULL;
+  long double *S = NULL, *SX = NULL, *SY = NULL, *MFLOW_X = NULL, *MFLOW_Y = NULL;
   S = malloc(sizeof(long double) * (ntc_y * ntc_x));
+  SX = malloc(sizeof(long double) * (ntc_y * ntc_x));
+  SY = malloc(sizeof(long double) * (ntc_y * ntc_x));
+  MFLOW_X = malloc(sizeof(long double) * (ntc_y * ntc_x)*M);
+  MFLOW_Y = malloc(sizeof(long double) * (ntc_y * ntc_x)*M);
   *MFLUX = malloc(sizeof(long double) * (ntc_y * ntc_x));
 	*MFLOW = malloc(sizeof(long double) * (ntc_y * ntc_x) * M);
 	*XFLOW = malloc(sizeof(long double) * (ntc_y * (ntc_x + 1)) * M);
 	*YFLOW = malloc(sizeof(long double) * ((ntc_y + 1) * ntc_x) * M);
-  if (*MFLUX == NULL || *MFLOW == NULL || *XFLOW == NULL || *YFLOW == NULL || S == NULL){
-    if (S != NULL) free(S); return 3;
+  if (*MFLUX == NULL || *MFLOW == NULL || *XFLOW == NULL || *YFLOW == NULL || S == NULL || SX == NULL || SY == NULL || MFLOW_X == NULL || MFLOW_Y == NULL){
+    if (S != NULL) free(S); if (SX != NULL) free(SX); if (SY != NULL) free(SY);
+    if (MFLOW_X != NULL) free(MFLOW_X); if (MFLOW_Y != NULL) free(MFLOW_Y);
+    return 3;
   }
   for (int j = 0; j < ntc_y; j++) {
 		for (int i = 0; i < ntc_x; i++) {
 			S[ntc_x * j + i] = 0.0; (*MFLUX)[ntc_x * j + i] = 0.0;
+      SX[ntc_x * j + i] = 0.0; SY[ntc_x * j + i] = 0.0;
 			for (int m = 0; m < M; m++) {
 				(*MFLOW)[M * (ntc_x * j + i) + m] = 0.0;
+        MFLOW_X[M * (ntc_x * j + i) + m] = 0.0;
+				MFLOW_Y[M * (ntc_x * j + i) + m] = 0.0;
 			}
 		}
 	}
@@ -637,7 +646,7 @@ int step (int N,               // Quadrature order
       if (m < M / 4) {
 				int j_b = 0, j_f = j_b + 1, i_b = 0, i_f = i_b + 1, nc_y, nc_x, z;
 				long double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q, len_y, len_x;
-				long double mflow, xflow, yflow;
+				long double mflow, xflow, yflow, mflow_x, mflow_y;
 				miu = MIU[m]; theta = THETA[m];
 				for (int ry = 0; ry < nyr; ry++) {
 					len_y = YDOM[2 * ry];                  nc_y = (int)YDOM[2 * ry + 1]; 
@@ -651,14 +660,24 @@ int step (int N,               // Quadrature order
 							alfa_x = fabs(h_x * st / miu); alfa_y = fabs(h_y * st / theta);
 							for (int i = 0; i < nc_x; i++) {
 								xflow = (*XFLOW)[M * ((ntc_x + 1) * j_b + i_b) + m];
-                yflow = (*YFLOW)[M*(ntc_x*j_b + i_b) + m];
-                mflow = (xflow/alfa_x + yflow/alfa_y + 
-                        S[ntc_x*j_b + i_b] + q/st) / (1.0 +
-                        1.0/alfa_x + 1.0/alfa_y);
-                (*MFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow;
-                (*XFLOW)[M * ((ntc_x + 1) * j_b + i_f) + m] = mflow;
-                (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = mflow;
-                i_b = i_b + 1; i_f = i_b + 1;
+								yflow = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+								mflow = (S[ntc_x*j_b + i_b] + q/st
+								         - SX[ntc_x*j_b + i_b]/(3.0 + alfa_x)
+										 - SY[ntc_x*j_b + i_b]/(3.0 + alfa_y)
+										 + (6.0 + alfa_x)*xflow/(alfa_x*(3.0 + alfa_x))
+										 + (6.0 + alfa_y)*yflow/(alfa_y*(3.0 + alfa_y)))/(1.0
+										 + (6.0 + alfa_x)/(alfa_x*(3.0 + alfa_x))
+										 + (6.0 + alfa_y)/(alfa_y*(3.0 + alfa_y)));
+								mflow_x = (alfa_x*SX[ntc_x*j_b + i_b] + 3.0*mflow - 3.0*xflow)/(3.0
+								           + alfa_x);
+								mflow_y = (alfa_y*SY[ntc_x*j_b + i_b] + 3.0*mflow - 3.0*yflow)/(3.0
+								           + alfa_y);
+								(*MFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow;
+								(*XFLOW)[M * ((ntc_x + 1) * j_b + i_f) + m] = mflow + mflow_x;
+								(*YFLOW)[M * (ntc_x * j_f + i_b) + m] = mflow + mflow_y;
+								MFLOW_X[M * (ntc_x * j_b + i_b) + m] = mflow_x;
+								MFLOW_Y[M * (ntc_x * j_b + i_b) + m] = mflow_y;
+								i_b = i_b + 1; i_f = i_b + 1;
 							}
 						}
 						j_b = j_b + 1; j_f = j_b + 1;
@@ -670,7 +689,7 @@ int step (int N,               // Quadrature order
       else if (m >= M / 4 && m < M / 2) {
 				int j_b = 0, j_f = j_b + 1, i_b = ntc_x - 1, i_f = i_b + 1, nc_y, nc_x, z;
 				long double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q, len_y, len_x;
-				long double mflow, xflow, yflow;
+				long double mflow, xflow, yflow, mflow_x, mflow_y;
 				miu = MIU[m]; theta = THETA[m];
 				for (int ry = 0; ry < nyr; ry++) {
 					len_y = YDOM[2 * ry];                  nc_y = (int)YDOM[2 * ry + 1];
@@ -685,12 +704,22 @@ int step (int N,               // Quadrature order
 							for (int i = 0; i < nc_x; i++) {
 								xflow = (*XFLOW)[M * ((ntc_x + 1) * j_b + i_f) + m];
 								yflow = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
-								mflow = (xflow / alfa_x + yflow / alfa_y +
-									     S[ntc_x * j_b + i_b] + q / st) / (1.0 +
-										 1.0 / alfa_x + 1.0 / alfa_y);
+								mflow = (S[ntc_x*j_b + i_b] + q/st
+								         + SX[ntc_x*j_b + i_b]/(3.0 + alfa_x)
+										 - SY[ntc_x*j_b + i_b]/(3.0 + alfa_y)
+										 + (6.0 + alfa_x)*xflow/(alfa_x*(3.0 + alfa_x))
+										 + (6.0 + alfa_y)*yflow/(alfa_y*(3.0 + alfa_y)))/(1.0
+										 + (6.0 + alfa_x)/(alfa_x*(3.0 + alfa_x))
+										 + (6.0 + alfa_y)/(alfa_y*(3.0 + alfa_y)));
+								mflow_x = (alfa_x*SX[ntc_x*j_b + i_b] - 3.0*mflow + 3.0*xflow)/(3.0
+								           + alfa_x);
+								mflow_y = (alfa_y*SY[ntc_x*j_b + i_b] + 3.0*mflow - 3.0*yflow)/(3.0
+								           + alfa_y);
 								(*MFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow;
-								(*XFLOW)[M * ((ntc_x + 1) * j_b + i_b) + m] = mflow;
-								(*YFLOW)[M * (ntc_x * j_f + i_b) + m] = mflow;
+								(*XFLOW)[M * ((ntc_x + 1) * j_b + i_b) + m] = mflow - mflow_x;
+								(*YFLOW)[M * (ntc_x * j_f + i_b) + m] = mflow + mflow_y;
+								MFLOW_X[M * (ntc_x * j_b + i_b) + m] = mflow_x;
+								MFLOW_Y[M * (ntc_x * j_b + i_b) + m] = mflow_y;
 								i_b = i_b - 1; i_f = i_b + 1;
 							}
 						}
@@ -703,7 +732,7 @@ int step (int N,               // Quadrature order
       else if (m >= M / 2 && m < 3 * M / 4) {
 				int j_b = ntc_y - 1, j_f = j_b + 1, i_b = ntc_x - 1, i_f = i_b + 1, nc_y, nc_x, z;
 				long double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q, len_y, len_x;
-				long double mflow, xflow, yflow;
+				long double mflow, xflow, yflow, mflow_x, mflow_y;
 				miu = MIU[m]; theta = THETA[m];
 				for (int ry = nyr-1; ry >= 0; ry--) {
 					len_y = YDOM[2 * ry];                  nc_y = (int)YDOM[2 * ry + 1];
@@ -718,12 +747,22 @@ int step (int N,               // Quadrature order
 							for (int i = 0; i < nc_x; i++) {
 								xflow = (*XFLOW)[M * ((ntc_x + 1) * j_b + i_f) + m];
 								yflow = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
-								mflow = (xflow / alfa_x + yflow / alfa_y +
-									     S[ntc_x * j_b + i_b] + q / st) / (1.0 +
-										 1.0 / alfa_x + 1.0 / alfa_y);
+								mflow = (S[ntc_x*j_b + i_b] + q/st
+								         + SX[ntc_x*j_b + i_b]/(3.0 + alfa_x)
+										 + SY[ntc_x*j_b + i_b]/(3.0 + alfa_y)
+										 + (6.0 + alfa_x)*xflow/(alfa_x*(3.0 + alfa_x))
+										 + (6.0 + alfa_y)*yflow/(alfa_y*(3.0 + alfa_y)))/(1.0
+										 + (6.0 + alfa_x)/(alfa_x*(3.0 + alfa_x))
+										 + (6.0 + alfa_y)/(alfa_y*(3.0 + alfa_y)));
+								mflow_x = (alfa_x*SX[ntc_x*j_b + i_b] - 3.0*mflow + 3.0*xflow)/(3.0
+								           + alfa_x);
+								mflow_y = (alfa_y*SY[ntc_x*j_b + i_b] - 3.0*mflow + 3.0*yflow)/(3.0
+								           + alfa_y);
 								(*MFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow;
-								(*XFLOW)[M * ((ntc_x + 1) * j_b + i_b) + m] = mflow;
-								(*YFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow;
+								(*XFLOW)[M * ((ntc_x + 1) * j_b + i_b) + m] = mflow - mflow_x;
+								(*YFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow - mflow_y;
+								MFLOW_X[M * (ntc_x * j_b + i_b) + m] = mflow_x;
+								MFLOW_Y[M * (ntc_x * j_b + i_b) + m] = mflow_y;
 								i_b = i_b - 1; i_f = i_b + 1;
 							}
 						}
@@ -736,7 +775,7 @@ int step (int N,               // Quadrature order
       else if (m >= 3 * M / 4 && m < M) {
 			  int j_b = ntc_y - 1, j_f = j_b + 1, i_b = 0, i_f = i_b + 1, nc_y, nc_x, z;
 				long double h_y, h_x, miu, theta, alfa_x, alfa_y, st, q, len_y, len_x;
-				long double mflow, xflow, yflow;
+				long double mflow, xflow, yflow, mflow_x, mflow_y;
 			  miu = MIU[m]; theta = THETA[m];
 			  for (int ry = nyr - 1; ry >= 0; ry--) {
 				  len_y = YDOM[2 * ry];                  nc_y = (int)YDOM[2 * ry + 1];
@@ -751,12 +790,22 @@ int step (int N,               // Quadrature order
 						  for (int i = 0; i < nc_x; i++) {
 							  xflow = (*XFLOW)[M * ((ntc_x + 1) * j_b + i_b) + m];
                 yflow = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
-                mflow = (xflow / alfa_x + yflow / alfa_y +
-                        S[ntc_x * j_b + i_b] + q / st) / (1.0 +
-                      1.0 / alfa_x + 1.0 / alfa_y);
+                mflow = (S[ntc_x*j_b + i_b] + q/st
+                        - SX[ntc_x*j_b + i_b]/(3.0 + alfa_x)
+                    + SY[ntc_x*j_b + i_b]/(3.0 + alfa_y)
+                    + (6.0 + alfa_x)*xflow/(alfa_x*(3.0 + alfa_x))
+                    + (6.0 + alfa_y)*yflow/(alfa_y*(3.0 + alfa_y)))/(1.0
+                    + (6.0 + alfa_x)/(alfa_x*(3.0 + alfa_x))
+                    + (6.0 + alfa_y)/(alfa_y*(3.0 + alfa_y)));
+                mflow_x = (alfa_x*SX[ntc_x*j_b + i_b] + 3.0*mflow - 3.0*xflow)/(3.0
+                            + alfa_x);
+                mflow_y = (alfa_y*SY[ntc_x*j_b + i_b] - 3.0*mflow + 3.0*yflow)/(3.0
+                            + alfa_y);
                 (*MFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow;
-                (*XFLOW)[M * ((ntc_x + 1) * j_b + i_f) + m] = mflow;
-                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow;
+                (*XFLOW)[M * ((ntc_x + 1) * j_b + i_f) + m] = mflow + mflow_x;
+                (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = mflow - mflow_y;
+                MFLOW_X[M * (ntc_x * j_b + i_b) + m] = mflow_x;
+                MFLOW_Y[M * (ntc_x * j_b + i_b) + m] = mflow_y;
                 i_b = i_b + 1; i_f = i_b + 1;
 						  }
 					  }
@@ -803,7 +852,7 @@ int step (int N,               // Quadrature order
 		}
 
     // SCALAR FLUX, SOURCE TERM AND STOP CRITERIA
-		long double faux, mflux, w, st, ss;
+		long double faux, mflux, w, st, ss, mflux_x, mflux_y;
 		int z;
 		j_b = 0;
 		for (int ry = 0; ry < nyr; ry++) {
@@ -815,9 +864,12 @@ int step (int N,               // Quadrature order
 					st = ZON[2 * z];               ss = ZON[2 * z + 1];
 					for (int i = 0; i < nc_x; i++) {
 						faux = (*MFLUX)[ntc_x * j_b + i_b]; mflux = 0.0;
+            mflux_x = 0.0; mflux_y = 0.0;
 						for (int m = 0; m < M; m++) {
 							w = W[m];
 							mflux = mflux + w * (*MFLOW)[M * (ntc_x * j_b + i_b) + m];
+              mflux_x = mflux_x + w * MFLOW_X[M * (ntc_x * j_b + i_b) + m];
+							mflux_y = mflux_y + w * MFLOW_Y[M * (ntc_x * j_b + i_b) + m];
 						}
 						mflux = 0.25 * mflux;
 						(*MFLUX)[ntc_x * j_b + i_b] = mflux;
@@ -825,6 +877,8 @@ int step (int N,               // Quadrature order
 						if (fabs(1 - faux / mflux) > ERR) ERR = fabs(1 - faux / mflux);
 						
 						S[ntc_x * j_b + i_b] = ss*mflux/st;
+            SX[ntc_x * j_b + i_b] = 0.25*ss*mflux_x/st;
+						SY[ntc_x * j_b + i_b] = 0.25*ss*mflux_y/st;
 						i_b = i_b + 1;
 					}
 				}
@@ -838,7 +892,8 @@ int step (int N,               // Quadrature order
   *cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
   printf("CPU TIME = %.5Le\n\n", *cpu_time);
 
-  if (S != NULL) free(S);
+  if (S != NULL) free(S); if (SX != NULL) free(SX); if (SY != NULL) free(SY);
+  if (MFLOW_X != NULL) free(MFLOW_X); if (MFLOW_Y != NULL) free(MFLOW_Y);
 
   if (*ITER >= 10000) return 5;
   return 0;
