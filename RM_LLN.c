@@ -4,7 +4,7 @@
 #include <time.h>
 #include <assert.h>
 #define printf __mingw_printf
-#define eps 1e-12
+#define eps 1e-18
 
 //////////////////////////////////////////////////////////////////////////////////// PROTOTYPES
 
@@ -200,14 +200,15 @@ int main(int argc, char *argv[]){
 
   // PRINT RESPONSE MATRIZ
   // long double *RAUX = NULL;
-  // printf("FM0:\n");
+  // printf("RM:\n");
   // for (int ry = 0; ry < nyr; ry++){
   //   for (int rx = 0; rx < nxr; rx++){
   //     printf("RY = %d, RX = %d:\n", ry, rx);
-  //     RAUX = get_FM0(M, nyr,nxr,ry,rx,FM0,&RAUX);
-  //     print_matrix(M,RAUX);
+  //     RAUX = get_RM(2*M, nyr,nxr,ry,rx,RM,&RAUX);
+  //     print_matrix(4*M,RAUX);
   //   }
   // }
+  // free(RAUX);
 
   // ITERATIVE SCHEME
   status = rm_lln (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, W, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW, &ITER, &cpu_time);
@@ -1115,7 +1116,7 @@ void print_spectrum(int N, int nz, long double XVALS[], long double XVECTS[], lo
 void print_vector(int M, long double Vector[]){
 
   for (int i = 0; i < M; i++){
-    printf("%.5Lf\n", Vector[i]);
+    printf("%.10Lf\n", Vector[i]);
   }
   printf("\n");
 
@@ -1126,7 +1127,7 @@ void print_matrix(int M, long double Matrix[]){
 
   for (int j = 0; j < M; j++){
     for (int i = 0; i < M; i++){
-      printf("%.5Lf ", Matrix[M * j + i]);
+      printf("%.3Le ", Matrix[M * j + i]);
     }
     printf("\n");
   }
@@ -1229,6 +1230,7 @@ long double* vector_sum(int M, long double Vector1[], long double Vector2[], lon
 
   for (int i = 0; i < M; i++){
     (*OUTPUT)[i] = Vector1[i] + Vector2[i];
+    if (fabs((*OUTPUT)[i]) < eps) (*OUTPUT)[i] = 0.0;
   }
 
   return *OUTPUT;
@@ -1245,6 +1247,7 @@ long double* matrix_sum(int M, long double Matrix1[], long double Matrix2[], lon
   for (int j = 0; j < M; j++){
     for (int i = 0; i < M; i++){
       (*OUTPUT)[M * j + i] = Matrix1[M * j + i] + Matrix2[M * j + i];
+      if (fabs((*OUTPUT)[M * j + i]) < eps) (*OUTPUT)[M * j + i] = 0.0;
     }
   }
 
@@ -1267,6 +1270,7 @@ long double* matrix_mult1(int M, long double Matrix[], long double X[], long dou
       sum = sum + Matrix[M * j + i] * X[i];
     }
     (*OUTPUT)[j] = sum;
+    if (fabs((*OUTPUT)[j]) < eps) (*OUTPUT)[j] = 0.0;
   }
 
   return *OUTPUT;
@@ -1284,11 +1288,12 @@ long double* matrix_mult2(int M, long double Matrix1[], long double Matrix2[], l
 
   for (int k = 0; k < M; k++) {
     for (int j = 0; j < M; j++){
-      sum = 0;
+      sum = 0.0;
       for (int i = 0; i < M; i++){
         sum = sum + Matrix1[M * j + i] * Matrix2[M * i + k];
       }
       (*OUTPUT)[M * j + k] = sum;
+      if (fabs((*OUTPUT)[M * j + k]) < eps) (*OUTPUT)[M * j + k] = 0.0;
     }
   }
 
@@ -1305,7 +1310,8 @@ long double* matrix_mult3(int M, long double Matrix1[], long double Matrix2[], l
 
   for (int k = 0; k < M; k++) {
     for (int j = 0; j < M; j++){
-      (*OUTPUT)[M * j + k] = Matrix1[M * k + j] * Matrix2[M * k + j];
+      (*OUTPUT)[M * k + j] = Matrix1[M * k + j] * Matrix2[M * k + j];
+      if (fabs((*OUTPUT)[M * k + j]) < eps) (*OUTPUT)[M * k + j] = 0.0;
     }
   }
 
@@ -1380,7 +1386,7 @@ int inv(int M, long double Matrix[], long double **OUTPUT){
   for (int k = 0; k < M; k++){
     (*OUTPUT)[M * (M - 1) + k] = IDEN[M * (M - 1) + k] / Matrix2[M * M - 1];
     for (int j = M - 2; j >= 0; j--){
-      sum = 0;
+      sum = 0.0;
       for (int i = j; i < M - 1; i++){
         sum = sum + Matrix2[M * j + i + 1] * (*OUTPUT)[M * (i + 1) + k];
       }
@@ -1543,7 +1549,7 @@ int response_matrix(int N,               // Quadrature order
 
   long double *LAMBDA_XIN = NULL, *LAMBDA_XOUT = NULL, *GAMA_XIN = NULL, *GAMA_XOUT = NULL;
   long double *LAMBDA_YIN = NULL, *LAMBDA_YOUT = NULL, *GAMA_YIN = NULL, *GAMA_YOUT = NULL;
-  long double *AUX1 = NULL, *AUX2 = NULL. *AUX3 = NULL;
+  long double *AUX1 = NULL, *AUX2 = NULL, *AUX3 = NULL;
   LAMBDA_XIN = malloc(sizeof(long double) * M * M);
   LAMBDA_XOUT = malloc(sizeof(long double) * M * M);
   GAMA_XIN = malloc(sizeof(long double) * M * M);
@@ -1567,6 +1573,9 @@ int response_matrix(int N,               // Quadrature order
   MM2 = malloc(sizeof(long double) * 4 * M * M);
   MM3 = malloc(sizeof(long double) * 4 * M * M);
   MM4 = malloc(sizeof(long double) * 4 * M * M);
+  IN = malloc(sizeof(long double) * 16 * M * M);
+  OUT = malloc(sizeof(long double) * 16 * M * M);
+  OUT_INV = malloc(sizeof(long double) * 16 * M * M);
 
   long double *VAUX1 = NULL, *VAUX2 = NULL, *VAUX3 = NULL, *V1 = NULL, *V2 = NULL, *IND1 = NULL, *IND2 = NULL;
   VAUX1 = malloc(sizeof(long double) * M);
@@ -1599,7 +1608,7 @@ int response_matrix(int N,               // Quadrature order
     if(GAMA_YIN != NULL) free(GAMA_YIN); if(GAMA_YOUT != NULL) free(GAMA_YOUT);
     if(AUX1 != NULL) free(AUX1); if(AUX2 != NULL) free(AUX2); if(AUX3 != NULL) free(AUX3);
 
-    if(RXIN_INV != NULL) free(RXIN_IN); if(RYIN_INV != NULL) free(RYIN_IN);
+    if(RXIN_INV != NULL) free(RXIN_INV); if(RYIN_INV != NULL) free(RYIN_INV);
     if(M1 != NULL) free(M1); if(M2 != NULL) free(M2); if(M3 != NULL) free(M3); if(M4 != NULL) free(M4);
     if(MM1 != NULL) free(MM1); if(MM2 != NULL) free(MM2); if(MM3 != NULL) free(MM3); if(MM4 != NULL) free(MM4);
     if(IN != NULL) free(IN); if(OUT != NULL) free(OUT); if(OUT_INV != NULL) free(OUT_INV);
@@ -2094,7 +2103,7 @@ int response_matrix(int N,               // Quadrature order
               FYY4OUT[M * m + k] = AYY4_PLUS[M * m + k];
             }
           }
-          else if (m > 3 * M / 4 && m < M){ // IVQ
+          else if (m >= 3 * M / 4 && m < M){ // IVQ
             if (k < M / 4){
               FX0[M * m + k] = AX0[M * m + k];
               FX1IN[M * m + k] = AX1_PLUS[M * m + k];
@@ -2220,6 +2229,7 @@ int response_matrix(int N,               // Quadrature order
           AUX1[M * m + i] = XVECTS[nz * (M * i + m) + z];
         }
       }
+
       vcond = inv(M, AUX1, &AUX2);
       if (vcond != 0){
         if(VAUX1 != NULL) free(VAUX1); if(VAUX2 != NULL) free(VAUX2); if(VAUX3 != NULL) free(VAUX3);
@@ -2231,7 +2241,7 @@ int response_matrix(int N,               // Quadrature order
         if(GAMA_YIN != NULL) free(GAMA_YIN); if(GAMA_YOUT != NULL) free(GAMA_YOUT);
         if(AUX1 != NULL) free(AUX1); if(AUX2 != NULL) free(AUX2); if(AUX3 != NULL) free(AUX3);
 
-        if(RXIN_INV != NULL) free(RXIN_IN); if(RYIN_INV != NULL) free(RYIN_IN);
+        if(RXIN_INV != NULL) free(RXIN_INV); if(RYIN_INV != NULL) free(RYIN_INV);
         if(M1 != NULL) free(M1); if(M2 != NULL) free(M2); if(M3 != NULL) free(M3); if(M4 != NULL) free(M4);
         if(MM1 != NULL) free(MM1); if(MM2 != NULL) free(MM2); if(MM3 != NULL) free(MM3); if(MM4 != NULL) free(MM4);
         if(IN != NULL) free(IN); if(OUT != NULL) free(OUT); if(OUT_INV != NULL) free(OUT_INV);
@@ -2280,7 +2290,7 @@ int response_matrix(int N,               // Quadrature order
         if(GAMA_YIN != NULL) free(GAMA_YIN); if(GAMA_YOUT != NULL) free(GAMA_YOUT);
         if(AUX1 != NULL) free(AUX1); if(AUX2 != NULL) free(AUX2); if(AUX3 != NULL) free(AUX3);
 
-        if(RXIN_INV != NULL) free(RXIN_IN); if(RYIN_INV != NULL) free(RYIN_IN);
+        if(RXIN_INV != NULL) free(RXIN_INV); if(RYIN_INV != NULL) free(RYIN_INV);
         if(M1 != NULL) free(M1); if(M2 != NULL) free(M2); if(M3 != NULL) free(M3); if(M4 != NULL) free(M4);
         if(MM1 != NULL) free(MM1); if(MM2 != NULL) free(MM2); if(MM3 != NULL) free(MM3); if(MM4 != NULL) free(MM4);
         if(IN != NULL) free(IN); if(OUT != NULL) free(OUT); if(OUT_INV != NULL) free(OUT_INV);
@@ -2382,7 +2392,7 @@ int response_matrix(int N,               // Quadrature order
         if(GAMA_YIN != NULL) free(GAMA_YIN); if(GAMA_YOUT != NULL) free(GAMA_YOUT);
         if(AUX1 != NULL) free(AUX1); if(AUX2 != NULL) free(AUX2); if(AUX3 != NULL) free(AUX3);
 
-        if(RXIN_INV != NULL) free(RXIN_IN); if(RYIN_INV != NULL) free(RYIN_IN);
+        if(RXIN_INV != NULL) free(RXIN_INV); if(RYIN_INV != NULL) free(RYIN_INV);
         if(M1 != NULL) free(M1); if(M2 != NULL) free(M2); if(M3 != NULL) free(M3); if(M4 != NULL) free(M4);
         if(MM1 != NULL) free(MM1); if(MM2 != NULL) free(MM2); if(MM3 != NULL) free(MM3); if(MM4 != NULL) free(MM4);
         if(IN != NULL) free(IN); if(OUT != NULL) free(OUT); if(OUT_INV != NULL) free(OUT_INV);
@@ -2421,7 +2431,7 @@ int response_matrix(int N,               // Quadrature order
         if(GAMA_YIN != NULL) free(GAMA_YIN); if(GAMA_YOUT != NULL) free(GAMA_YOUT);
         if(AUX1 != NULL) free(AUX1); if(AUX2 != NULL) free(AUX2); if(AUX3 != NULL) free(AUX3);
 
-        if(RXIN_INV != NULL) free(RXIN_IN); if(RYIN_INV != NULL) free(RYIN_IN);
+        if(RXIN_INV != NULL) free(RXIN_INV); if(RYIN_INV != NULL) free(RYIN_INV);
         if(M1 != NULL) free(M1); if(M2 != NULL) free(M2); if(M3 != NULL) free(M3); if(M4 != NULL) free(M4);
         if(MM1 != NULL) free(MM1); if(MM2 != NULL) free(MM2); if(MM3 != NULL) free(MM3); if(MM4 != NULL) free(MM4);
         if(IN != NULL) free(IN); if(OUT != NULL) free(OUT); if(OUT_INV != NULL) free(OUT_INV);
@@ -2462,7 +2472,7 @@ int response_matrix(int N,               // Quadrature order
       AUX1 = matrix_mult2(M, M4, FY0, &AUX1);
       AUX2 = matrix_neg(M, AUX1, &AUX2);
       AUX3 = matrix_sum(M, FY0, AUX2, &AUX3);
-      M3 = matrix_neg(M, AUX3, &M2);
+      M3 = matrix_neg(M, AUX3, &M3);
 
       MM1 = matrix_concat(M, M1, M2, M3, M4, &MM1);
 
@@ -2760,7 +2770,7 @@ int response_matrix(int N,               // Quadrature order
         if(GAMA_YIN != NULL) free(GAMA_YIN); if(GAMA_YOUT != NULL) free(GAMA_YOUT);
         if(AUX1 != NULL) free(AUX1); if(AUX2 != NULL) free(AUX2); if(AUX3 != NULL) free(AUX3);
 
-        if(RXIN_INV != NULL) free(RXIN_IN); if(RYIN_INV != NULL) free(RYIN_IN);
+        if(RXIN_INV != NULL) free(RXIN_INV); if(RYIN_INV != NULL) free(RYIN_INV);
         if(M1 != NULL) free(M1); if(M2 != NULL) free(M2); if(M3 != NULL) free(M3); if(M4 != NULL) free(M4);
         if(MM1 != NULL) free(MM1); if(MM2 != NULL) free(MM2); if(MM3 != NULL) free(MM3); if(MM4 != NULL) free(MM4);
         if(IN != NULL) free(IN); if(OUT != NULL) free(OUT); if(OUT_INV != NULL) free(OUT_INV);
@@ -2800,13 +2810,13 @@ int response_matrix(int N,               // Quadrature order
       // PART 1
       AUX1 = matrix_mult2(M, RXOUT, RXIN_INV, &AUX1);
       AUX2 = matrix_neg(M, AUX1, &AUX2);
-      AUX3 = eye(M, AUX3);
+      AUX3 = eye(M, &AUX3);
       AUX1 = matrix_sum(M, AUX3, AUX2, &AUX1);
       VAUX1 = matrix_mult1(M, AUX1, SX, &VAUX1);
 
       AUX1 = matrix_mult2(M, RYOUT, RYIN_INV, &AUX1);
       AUX2 = matrix_neg(M, AUX1, &AUX2);
-      AUX3 = eye(M, AUX3);
+      AUX3 = eye(M, &AUX3);
       AUX1 = matrix_sum(M, AUX3, AUX2, &AUX1);
       VAUX2 = matrix_mult1(M, AUX1, SY, &VAUX2);
 
@@ -2866,7 +2876,7 @@ int response_matrix(int N,               // Quadrature order
   if(GAMA_YIN != NULL) free(GAMA_YIN); if(GAMA_YOUT != NULL) free(GAMA_YOUT);
   if(AUX1 != NULL) free(AUX1); if(AUX2 != NULL) free(AUX2); if(AUX3 != NULL) free(AUX3);
 
-  if(RXIN_INV != NULL) free(RXIN_IN); if(RYIN_INV != NULL) free(RYIN_IN);
+  if(RXIN_INV != NULL) free(RXIN_INV); if(RYIN_INV != NULL) free(RYIN_INV);
   if(M1 != NULL) free(M1); if(M2 != NULL) free(M2); if(M3 != NULL) free(M3); if(M4 != NULL) free(M4);
   if(MM1 != NULL) free(MM1); if(MM2 != NULL) free(MM2); if(MM3 != NULL) free(MM3); if(MM4 != NULL) free(MM4);
   if(IN != NULL) free(IN); if(OUT != NULL) free(OUT); if(OUT_INV != NULL) free(OUT_INV);
@@ -3027,6 +3037,15 @@ int rm_lln (int N,               // Quadrature order
 	*XFLOW = malloc(sizeof(long double) * (ntc_y * (ntc_x + 1)) * M);
 	*YFLOW = malloc(sizeof(long double) * ((ntc_y + 1) * ntc_x) * M);
   if (*MFLUX == NULL || *MFLOW == NULL || *XFLOW == NULL || *YFLOW == NULL) return 3;
+
+  long double *XXFLOW = NULL, *YYFLOW = NULL;
+  XXFLOW = malloc(sizeof(long double) * (ntc_y * (ntc_x + 1)) * M);
+  YYFLOW = malloc(sizeof(long double) * (ntc_y * (ntc_x + 1)) * M);
+  if (XXFLOW == NULL || YYFLOW == NULL){
+    if (XXFLOW != NULL) free(XXFLOW); if (YYFLOW != NULL) free(YYFLOW);
+    return 3;
+  }
+
   for (int j = 0; j < ntc_y; j++) {
 		for (int i = 0; i < ntc_x; i++) {
 			(*MFLUX)[ntc_x * j + i] = 0.0;
@@ -3039,6 +3058,7 @@ int rm_lln (int N,               // Quadrature order
 		for (int i = 0; i < ntc_x + 1; i++) {
 			for (int m = 0; m < M; m++) {
 				(*XFLOW)[M * ((ntc_x + 1) * j + i) + m] = 0.0;
+        XXFLOW[M * ((ntc_x + 1) * j + i) + m] = 0.0;
 				if ((i == 0) && (BC[0] != -1.0)) {
 					(*XFLOW)[M * ((ntc_x + 1) * j + i) + m] = BC[0];
 				}
@@ -3052,6 +3072,7 @@ int rm_lln (int N,               // Quadrature order
 		for (int i = 0; i < ntc_x; i++) {
 			for (int m = 0; m < M; m++) {
 				(*YFLOW)[M * (ntc_x * j + i) + m] = 0.0;
+        YYFLOW[M * (ntc_x * j + i) + m] = 0.0;
 				if (j == 0 && BC[1] != -1.0) {
 					(*YFLOW)[M * (ntc_x * j + i) + m] = BC[1];
 				}
@@ -3069,11 +3090,11 @@ int rm_lln (int N,               // Quadrature order
   int nc_y, nc_x;
   long double *IN = NULL, *OUT = NULL; 
   long double *RESP_MATRIX = NULL, *PART_VECTOR = NULL, *V_AUX = NULL;
-  IN = malloc(sizeof(long double) * 2 * M);
-  OUT = malloc(sizeof(long double) * 2 * M);
-  RESP_MATRIX = malloc(sizeof(long double) * 4 * M * M);
-  PART_VECTOR = malloc(sizeof(long double) * 2 * M);
-  V_AUX = malloc(sizeof(long double) * 2 * M);
+  IN = malloc(sizeof(long double) * 4 * M);
+  OUT = malloc(sizeof(long double) * 4 * M);
+  RESP_MATRIX = malloc(sizeof(long double) * 16 * M * M);
+  PART_VECTOR = malloc(sizeof(long double) * 4 * M);
+  V_AUX = malloc(sizeof(long double) * 4 * M);
   long double *X_VECTOR = NULL, *Y_VECTOR = NULL, *M_VECTOR = NULL, *V_AUX2 = NULL;
   long double *FM_0 = NULL, *FM_1 = NULL, *S_VECTOR = NULL;
   X_VECTOR = malloc(sizeof(long double) * M);
@@ -3093,6 +3114,8 @@ int rm_lln (int N,               // Quadrature order
     if (M_VECTOR != NULL) free(M_VECTOR); if (V_AUX2 != NULL) free(V_AUX2);
     if (FM_0 != NULL) free(FM_0); if (FM_1 != NULL) free(FM_1); if (S_VECTOR != NULL) free(S_VECTOR);
 
+    if (XXFLOW != NULL) free(XXFLOW); if (YYFLOW != NULL) free(YYFLOW);
+
     return 3;
   }
 
@@ -3110,8 +3133,8 @@ int rm_lln (int N,               // Quadrature order
       for (int j = 0; j < nc_y; j++) {
         i_b = 0; i_f = i_b + 1;
         for (int rx = 0; rx < nxr; rx++) {
-          RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
-          PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
+          RESP_MATRIX = get_RM(2*M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
+          PART_VECTOR = get_PV(2*M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
           nc_x = (int)XDOM[2 * rx + 1];
           for (int i = 0; i < nc_x; i++) {
 
@@ -3119,40 +3142,56 @@ int rm_lln (int N,               // Quadrature order
               if (m < M / 4){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_b + i_b) + m];
               }
               else if (m >= M / 4 && m < M / 2){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_b + i_b) + m];
               }
               else if (m >= M / 2 && m < 3 * M / 4){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_f + i_b) + m];
               }
               else if (m >= 3 * M / 4 && m < M){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_f + i_b) + m];
               }
             }
 
-            V_AUX = matrix_mult1(2*M, RESP_MATRIX, IN, &V_AUX);
-            OUT = vector_sum(2*M, V_AUX, PART_VECTOR, &OUT);
+            V_AUX = matrix_mult1(4*M, RESP_MATRIX, IN, &V_AUX);
+            OUT = vector_sum(4*M, V_AUX, PART_VECTOR, &OUT);
 
             for (int m = 0; m < M; m++){
               if (m < M / 4){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_f + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= M / 4 && m < M / 2){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_f + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= M / 2 && m < 3 * M / 4){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_b + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= 3 * M / 4 && m < M){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_b + i_b) + m] = OUT[3*M + m];
               }
             }
 
@@ -3171,8 +3210,8 @@ int rm_lln (int N,               // Quadrature order
       for (int j = 0; j < nc_y; j++) {
         i_b = ntc_x - 1; i_f = i_b + 1;
         for (int rx = nxr-1; rx >= 0; rx--) {
-          RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
-          PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
+          RESP_MATRIX = get_RM(2*M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
+          PART_VECTOR = get_PV(2*M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
           nc_x = (int)XDOM[2 * rx + 1];
           for (int i = 0; i < nc_x; i++) {
 
@@ -3180,40 +3219,56 @@ int rm_lln (int N,               // Quadrature order
               if (m < M / 4){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_b + i_b) + m];
               }
               else if (m >= M / 4 && m < M / 2){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_b + i_b) + m];
               }
               else if (m >= M / 2 && m < 3 * M / 4){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_f + i_b) + m];
               }
               else if (m >= 3 * M / 4 && m < M){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_f + i_b) + m];
               }
             }
 
-            V_AUX = matrix_mult1(2*M, RESP_MATRIX, IN, &V_AUX);
-            OUT = vector_sum(2*M, V_AUX, PART_VECTOR, &OUT);
+            V_AUX = matrix_mult1(4*M, RESP_MATRIX, IN, &V_AUX);
+            OUT = vector_sum(4*M, V_AUX, PART_VECTOR, &OUT);
 
             for (int m = 0; m < M; m++){
               if (m < M / 4){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_f + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= M / 4 && m < M / 2){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_f + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= M / 2 && m < 3 * M / 4){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_b + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= 3 * M / 4 && m < M){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_b + i_b) + m] = OUT[3*M + m];
               }
             }
 
@@ -3232,8 +3287,8 @@ int rm_lln (int N,               // Quadrature order
       for (int j = 0; j < nc_y; j++) {
         i_b = ntc_x - 1; i_f = i_b + 1;
         for (int rx = nxr - 1; rx >= 0; rx--) {
-          RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
-          PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
+          RESP_MATRIX = get_RM(2*M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
+          PART_VECTOR = get_PV(2*M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
           nc_x = (int)XDOM[2 * rx + 1];
           for (int i = 0; i < nc_x; i++) {
 
@@ -3241,40 +3296,56 @@ int rm_lln (int N,               // Quadrature order
               if (m < M / 4){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_b + i_b) + m];
               }
               else if (m >= M / 4 && m < M / 2){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_b + i_b) + m];
               }
               else if (m >= M / 2 && m < 3 * M / 4){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_f + i_b) + m];
               }
               else if (m >= 3 * M / 4 && m < M){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_f + i_b) + m];
               }
             }
 
-            V_AUX = matrix_mult1(2*M, RESP_MATRIX, IN, &V_AUX);
-            OUT = vector_sum(2*M, V_AUX, PART_VECTOR, &OUT);
+            V_AUX = matrix_mult1(4*M, RESP_MATRIX, IN, &V_AUX);
+            OUT = vector_sum(4*M, V_AUX, PART_VECTOR, &OUT);
 
             for (int m = 0; m < M; m++){
               if (m < M / 4){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_f + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= M / 4 && m < M / 2){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_f + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= M / 2 && m < 3 * M / 4){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_b + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= 3 * M / 4 && m < M){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_b + i_b) + m] = OUT[3*M + m];
               }
             }
 
@@ -3293,8 +3364,8 @@ int rm_lln (int N,               // Quadrature order
       for (int j = 0; j < nc_y; j++) {
         i_b = 0; i_f = i_b + 1;
         for (int rx = 0; rx < nxr; rx++) {
-          RESP_MATRIX = get_RM(M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
-          PART_VECTOR = get_PV(M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
+          RESP_MATRIX = get_RM(2*M, nyr, nxr, ry, rx, RM, &RESP_MATRIX);
+          PART_VECTOR = get_PV(2*M, nyr, nxr, ry, rx, PV, &PART_VECTOR);
           nc_x = (int)XDOM[2 * rx + 1];
           for (int i = 0; i < nc_x; i++) {
 
@@ -3302,40 +3373,56 @@ int rm_lln (int N,               // Quadrature order
               if (m < M / 4){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_b + i_b) + m];
               }
               else if (m >= M / 4 && m < M / 2){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_b + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_b + i_b) + m];
               }
               else if (m >= M / 2 && m < 3 * M / 4){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_f + i_b) + m];
               }
               else if (m >= 3 * M / 4 && m < M){
                 IN[m] = (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m];
                 IN[M + m] = (*YFLOW)[M * (ntc_x * j_f + i_b) + m];
+                IN[2*M + m] = XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m];
+                IN[3*M + m] = YYFLOW[M * (ntc_x * j_f + i_b) + m];
               }
             }
 
-            V_AUX = matrix_mult1(2*M, RESP_MATRIX, IN, &V_AUX);
-            OUT = vector_sum(2*M, V_AUX, PART_VECTOR, &OUT);
+            V_AUX = matrix_mult1(4*M, RESP_MATRIX, IN, &V_AUX);
+            OUT = vector_sum(4*M, V_AUX, PART_VECTOR, &OUT);
 
             for (int m = 0; m < M; m++){
               if (m < M / 4){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_f + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= M / 4 && m < M / 2){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_f + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_f + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= M / 2 && m < 3 * M / 4){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_b) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_b + i_b) + m] = OUT[3*M + m];
               }
               else if (m >= 3 * M / 4 && m < M){
                 (*XFLOW)[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[m];
                 (*YFLOW)[M * (ntc_x * j_b + i_b) + m] = OUT[M + m];
+                XXFLOW[M * ((ntc_x + 1)* j_b + i_f) + m] = OUT[2*M + m];
+                YYFLOW[M * (ntc_x * j_b + i_b) + m] = OUT[3*M + m];
               }
             }
 
@@ -3355,11 +3442,15 @@ int rm_lln (int N,               // Quadrature order
 				for (int m = 0; m < M/4; m++) {
 					if (BC[0] == -1.0) {
 						(*XFLOW)[M * ((ntc_x + 1) * j_b + 0) + m] = (*XFLOW)[M * ((ntc_x + 1) * j_b + 0) + M/4 + m];
+            XXFLOW[M * ((ntc_x + 1) * j_b + 0) + m] = XXFLOW[M * ((ntc_x + 1) * j_b + 0) + M/4 + m];
 						(*XFLOW)[M * ((ntc_x + 1) * j_b + 0) + 3*M/4 + m] = (*XFLOW)[M * ((ntc_x + 1) * j_b + 0) + M/2 + m];
+            XXFLOW[M * ((ntc_x + 1) * j_b + 0) + 3*M/4 + m] = XXFLOW[M * ((ntc_x + 1) * j_b + 0) + M/2 + m];
 					}
 					if (BC[2] == -1.0) {
 						(*XFLOW)[M * ((ntc_x + 1) * j_b + ntc_x) + M/4 + m] = (*XFLOW)[M * ((ntc_x + 1) * j_b + ntc_x) + m];
+            XXFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + M/4 + m] = XXFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + m];
 						(*XFLOW)[M * ((ntc_x + 1) * j_b + ntc_x) + M/2 + m] = (*XFLOW)[M * ((ntc_x + 1) * j_b + ntc_x) + 3*M/4 + m];
+            XXFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + M/2 + m] = XXFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + 3*M/4 + m];
 					}
 				}
 				j_b = j_b + 1;
@@ -3372,11 +3463,15 @@ int rm_lln (int N,               // Quadrature order
 				for (int m = 0; m < M / 4; m++) {
 					if (BC[1] == -1.0) {
 						(*YFLOW)[M * (ntc_x * 0 + i_b) + m] = (*YFLOW)[M * (ntc_x * 0 + i_b) + 3*M/4 + m];
+            YYFLOW[M * (ntc_x * 0 + i_b) + m] = YYFLOW[M * (ntc_x * 0 + i_b) + 3*M/4 + m];
 						(*YFLOW)[M * (ntc_x * 0 + i_b) + M/4 + m] = (*YFLOW)[M * (ntc_x * 0 + i_b) + M/2 + m];
+            YYFLOW[M * (ntc_x * 0 + i_b) + M/4 + m] = YYFLOW[M * (ntc_x * 0 + i_b) + M/2 + m];
 					}
 					if (BC[3] == -1.0) {
 						(*YFLOW)[M * (ntc_x * ntc_y + i_b) + 3*M/4 + m] = (*YFLOW)[M * (ntc_x * ntc_y + i_b) + m];
+            YYFLOW[M * (ntc_x * ntc_y + i_b) + 3*M/4 + m] = YYFLOW[M * (ntc_x * ntc_y + i_b) + m];
 						(*YFLOW)[M * (ntc_x * ntc_y + i_b) + M/2 + m] = (*YFLOW)[M * (ntc_x * ntc_y + i_b) + M/4 + m];
+            YYFLOW[M * (ntc_x * ntc_y + i_b) + M/2 + m] = YYFLOW[M * (ntc_x * ntc_y + i_b) + M/4 + m];
 					}
 				}
 				i_b = i_b + 1;
@@ -3456,10 +3551,15 @@ int rm_lln (int N,               // Quadrature order
   *cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
   printf("CPU TIME = %.5Le\n\n", *cpu_time);
 
-  free(IN); free(OUT); 
-  free(RESP_MATRIX); free(PART_VECTOR); free(V_AUX);
-  free(X_VECTOR); free(Y_VECTOR); free(M_VECTOR); free(V_AUX2);
-  free(FM_0); free(FM_1); free(S_VECTOR);
+  // FREE MEMORY
+  if (IN != NULL) free(IN); if (OUT != NULL) free(OUT); if (RESP_MATRIX != NULL) free(RESP_MATRIX);
+  if (PART_VECTOR != NULL) free(PART_VECTOR); if (V_AUX != NULL) free(V_AUX);
+
+  if (X_VECTOR != NULL) free(X_VECTOR); if (Y_VECTOR != NULL) free(Y_VECTOR);
+  if (M_VECTOR != NULL) free(M_VECTOR); if (V_AUX2 != NULL) free(V_AUX2);
+  if (FM_0 != NULL) free(FM_0); if (FM_1 != NULL) free(FM_1); if (S_VECTOR != NULL) free(S_VECTOR);
+
+  if (XXFLOW != NULL) free(XXFLOW); if (YYFLOW != NULL) free(YYFLOW);
 
   if (*ITER >= 10000) return 5;
   return 0;
