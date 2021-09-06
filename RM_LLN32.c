@@ -6,84 +6,75 @@
 #include <assert.h>
 #include <crtdbg.h>
 #define printf __mingw_printf
-#define eps 1e-18
-#define p128bit long double
+#define eps 1e-5
+#define p32bit float
+
 
 //////////////////////////////////////////////////////////////////////////////////// PROTOTYPES
 
 ///////////////////////////////////////////////////////// FREE MEMORY REQUESTED
-void free_memory(p128bit **ZON, p128bit **XDOM, p128bit **YDOM, int **ZMAP, p128bit **QMAP, p128bit **MIU, p128bit **THETA, p128bit **FI, p128bit **W, p128bit **LIST, p128bit **XVALS, p128bit **XVECTS, p128bit **YVALS, p128bit **YVECTS, p128bit **RM, p128bit **PV, p128bit **FM0, p128bit **FM1, p128bit **SM, p128bit **MFLUX, p128bit **MFLOW, p128bit **XFLOW, p128bit **YFLOW);
+void free_memory(p32bit **ZON, p32bit **XDOM, p32bit **YDOM, int **ZMAP, p32bit **QMAP, p32bit **MIU, p32bit **THETA, p32bit **FI, p32bit **W, p32bit **LIST, p32bit **XVALS, p32bit **XVECTS, p32bit **YVALS, p32bit **YVECTS, p32bit **RM, p32bit **PV, p32bit **FM0, p32bit **FM1, p32bit **SM, p32bit **MFLUX, p32bit **MFLOW, p32bit **XFLOW, p32bit **YFLOW);
 
 //////////////////////////////////////////////////////// LOAD PROBLEM FROM FILE
-int input_by_txt(int *N, int *nz, p128bit **ZON, int *nxr, p128bit **XDOM, int *nyr, p128bit **YDOM, int **ZMAP, p128bit **QMAP, p128bit *BC, p128bit *tol, const char *filename);
+int input_by_txt(int *N, int *nz, p32bit **ZON, int *nxr, p32bit **XDOM, int *nyr, p32bit **YDOM, int **ZMAP, p32bit **QMAP, p32bit *BC, p32bit *tol, const char *filename);
 
 /////////////////////////////////////////////////////////// GENERATE QUADRATURE
-int quad(int N, p128bit **MIU, p128bit **THETA, p128bit **CHI, p128bit **W, p128bit **LIST);
+int quad(int N, p32bit **MIU, p32bit **THETA, p32bit **CHI, p32bit **W, p32bit **LIST);
 
 ////////////////////////////////////////////////////////////////////// SPECTRUM
-void myXFunc(int N, p128bit x, p128bit MIU[], p128bit W[], p128bit c0, p128bit *y);
+void myXFunc(int N, p32bit x, p32bit MIU[], p32bit W[], p32bit c0, p32bit *y);
 
-void myXRootFunc(int N, p128bit a, p128bit b, p128bit MIU[], p128bit W[], p128bit c0, p128bit *root);
+void myXRootFunc(int N, p32bit a, p32bit b, p32bit MIU[], p32bit W[], p32bit c0, p32bit *root);
 
-void myYFunc(int N, p128bit x, p128bit THETA[], p128bit W[], p128bit c0, p128bit *y);
+void myYFunc(int N, p32bit x, p32bit THETA[], p32bit W[], p32bit c0, p32bit *y);
 
-void myYRootFunc(int N, p128bit a, p128bit b, p128bit THETA[], p128bit W[], p128bit c0, p128bit *root);
+void myYRootFunc(int N, p32bit a, p32bit b, p32bit THETA[], p32bit W[], p32bit c0, p32bit *root);
 
-int spectrum(int N, p128bit MIU[], p128bit THETA[], p128bit LIST[], p128bit W[], int nz, p128bit ZON[], p128bit **xvals, p128bit **xvects, p128bit **yvals, p128bit **yvects);
-
-void print_spectrum(int N, int nz, p128bit XVALS[], p128bit XVECTS[], p128bit YVALS[], p128bit YVECTS[]);
+int spectrum(int N, p32bit MIU[], p32bit THETA[], p32bit LIST[], p32bit W[], int nz, p32bit ZON[], p32bit **xvals, p32bit **xvects, p32bit **yvals, p32bit **yvects);
 
 ////////////////////////////////////////////////////////////// MATRIX FUNCTIONS
-void print_vector(int M, p128bit Vector[]);
+p32bit* zeros(int M, p32bit **OUTPUT);
 
-void print_matrix(int M, p128bit Matrix[]);
+p32bit* eye(int M, p32bit **OUTPUT);
 
-p128bit* zeros(int M, p128bit **OUTPUT);
+p32bit* equal(int M, p32bit Matrix[], p32bit **OUTPUT);
 
-p128bit* eye(int M, p128bit **OUTPUT);
+p32bit* vector_neg(int M, p32bit VECTOR[], p32bit **OUTPUT);
 
-p128bit* equal(int M, p128bit Matrix[], p128bit **OUTPUT);
+p32bit* matrix_neg(int M, p32bit Matrix[], p32bit **OUTPUT);
 
-p128bit* vector_neg(int M, p128bit VECTOR[], p128bit **OUTPUT);
+p32bit* matrix_sum(int M, p32bit Matrix1[], p32bit Matrix2[], p32bit **OUTPUT);
 
-p128bit* matrix_neg(int M, p128bit Matrix[], p128bit **OUTPUT);
+p32bit* matrix_mult1(int M, p32bit Matrix[], p32bit X[], p32bit **OUTPUT);
 
-p128bit* matrix_sum(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUTPUT);
+p32bit* matrix_mult2(int M, p32bit Matrix1[], p32bit Matrix2[], p32bit **OUTPUT);
 
-p128bit* matrix_mult1(int M, p128bit Matrix[], p128bit X[], p128bit **OUTPUT);
+p32bit* matrix_mult3(int M, p32bit Matrix1[], p32bit Matrix2[], p32bit **OUTPUT);
 
-p128bit* matrix_mult2(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUTPUT);
+int inv(int M, p32bit Matrix[], p32bit **OUTPUT);
 
-p128bit* matrix_mult3(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUTPUT);
+p32bit* vector_concat(int M, p32bit V1[], p32bit V2[], p32bit **OUTPUT);
 
-int inv(int M, p128bit Matrix[], p128bit **OUTPUT);
-
-p128bit* vector_concat(int M, p128bit V1[], p128bit V2[], p128bit **OUTPUT);
-
-p128bit* matrix_concat(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit Matrix3[], p128bit Matrix4[], p128bit **OUTPUT);
+p32bit* matrix_concat(int M, p32bit Matrix1[], p32bit Matrix2[], p32bit Matrix3[], p32bit Matrix4[], p32bit **OUTPUT);
 
 ////////////////////////////////////////////////////////////// RESPONSE MATRIX
-int response_matrix(int N, int nz, p128bit ZON[], int nxr, p128bit XDOM[], int nyr, p128bit YDOM[], int ZMAP[], p128bit QMAP[], p128bit MIU[], p128bit THETA[], p128bit W[], p128bit XVALS[], p128bit XVECTS[], p128bit YVALS[], p128bit YVECTS[], p128bit **RM, p128bit **PV, p128bit **FM0, p128bit **FM1, p128bit **SM);
+int response_matrix(int N, int nz, p32bit ZON[], int nxr, p32bit XDOM[], int nyr, p32bit YDOM[], int ZMAP[], p32bit QMAP[], p32bit MIU[], p32bit THETA[], p32bit W[], p32bit XVALS[], p32bit XVECTS[], p32bit YVALS[], p32bit YVECTS[], p32bit **RM, p32bit **PV, p32bit **FM0, p32bit **FM1, p32bit **SM);
 
-p128bit* get_RM(int M, int nyr, int nxr, int ry, int rx, p128bit RM[], p128bit **OUTPUT);
+p32bit* get_RM(int M, int nyr, int nxr, int ry, int rx, p32bit RM[], p32bit **OUTPUT);
 
-p128bit* get_PV(int M, int nyr, int nxr, int ry, int rx, p128bit PV[], p128bit **OUTPUT);
+p32bit* get_PV(int M, int nyr, int nxr, int ry, int rx, p32bit PV[], p32bit **OUTPUT);
 
-p128bit* get_FM0(int M, int nyr, int nxr, int ry, int rx, p128bit FM0[], p128bit **OUTPUT);
+p32bit* get_FM0(int M, int nyr, int nxr, int ry, int rx, p32bit FM0[], p32bit **OUTPUT);
 
-p128bit* get_FM1(int M, int nyr, int nxr, int ry, int rx, p128bit FM1[], p128bit **OUTPUT);
+p32bit* get_FM1(int M, int nyr, int nxr, int ry, int rx, p32bit FM1[], p32bit **OUTPUT);
 
-p128bit* get_SM(int M, int nyr, int nxr, int ry, int rx, p128bit SM[], p128bit **OUTPUT);
+p32bit* get_SM(int M, int nyr, int nxr, int ry, int rx, p32bit SM[], p32bit **OUTPUT);
 
 //////////////////////////////////////////////////////// RM_CN ITERATIVE SCHEME
-int rm_lln (int N, int nz, p128bit ZON[], int nxr, p128bit XDOM[], int nyr, p128bit YDOM[], int ZMAP[], p128bit QMAP[], p128bit BC[], p128bit tol, p128bit W[], p128bit RM[], p128bit PV[], p128bit FM0[], p128bit FM1[], p128bit SM[], p128bit **MFLUX, p128bit **MFLOW, p128bit **XFLOW, p128bit **YFLOW, int *ITER, p128bit *cpu_time);
+int rm_lln (int N, int nz, p32bit ZON[], int nxr, p32bit XDOM[], int nyr, p32bit YDOM[], int ZMAP[], p32bit QMAP[], p32bit BC[], p32bit tol, p32bit W[], p32bit RM[], p32bit PV[], p32bit FM0[], p32bit FM1[], p32bit SM[], p32bit **MFLUX, p32bit **MFLOW, p32bit **XFLOW, p32bit **YFLOW, int *ITER, p32bit *cpu_time);
 
 ////////////////////////////////////////////////////////// AUXILIARY FUNCTIONS
-void print_problem(int N, int nz, p128bit ZON[], int nxr, p128bit XDOM[], int nyr, p128bit YDOM[], int ZMAP[], p128bit QMAP[], p128bit BC[], p128bit tol);
-
-void post_processing(int N, int nz, p128bit ZON[], int nxr, p128bit XDOM[], int nyr, p128bit YDOM[], int ZMAP[], p128bit QMAP[], p128bit BC[], p128bit MIU[], p128bit THETA[], p128bit W[], p128bit MFLUX[], p128bit MFLOW[], p128bit XFLOW[], p128bit YFLOW[]);
-
-void json_output(int N, int nxr, p128bit XDOM[], int nyr, p128bit YDOM[], int status, int ITER, p128bit cpu_time, p128bit MFLUX[], p128bit MFLOW[], p128bit XFLOW[], p128bit YFLOW[]);
+void json_output(int N, int nxr, p32bit XDOM[], int nyr, p32bit YDOM[], int status, int ITER, p32bit cpu_time, p32bit MFLUX[], p32bit MFLOW[], p32bit XFLOW[], p32bit YFLOW[]);
                   
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -96,44 +87,44 @@ int main(int argc, char *argv[]){
   // INPUT VARIABLES
   int N = 0;                   // Quadrature order
   int nz = 0;                  // Number of zones
-  p128bit *ZON = NULL;     // Zone entries
+  p32bit *ZON = NULL;     // Zone entries
   int nxr = 0;                 // Number of regions in X
-  p128bit *XDOM = NULL;    // X Region entries
+  p32bit *XDOM = NULL;    // X Region entries
   int nyr = 0;                 // Number of regions in Y
-  p128bit *YDOM = NULL;    // Y Region entries
+  p32bit *YDOM = NULL;    // Y Region entries
   int *ZMAP = NULL;            // Zone map
-  p128bit *QMAP = NULL;    // External source map
-  p128bit BC[4] = {0.0};   // Boundary conditions
-  p128bit tol = 0.0;       // Tolerance
+  p32bit *QMAP = NULL;    // External source map
+  p32bit BC[4] = {0.0};   // Boundary conditions
+  p32bit tol = 0.0;       // Tolerance
   const char *filename = NULL; // File name to load
 
   // QUADRATURE VARIABLES
-  p128bit *MIU = NULL;   // Ordinates in X
-  p128bit *THETA = NULL; // Ordinates in Y
-  p128bit *FI = NULL;    // Ordinates in Z
-  p128bit *W = NULL;     // Weight
-  p128bit *LIST = NULL;  // Ordinates list
+  p32bit *MIU = NULL;   // Ordinates in X
+  p32bit *THETA = NULL; // Ordinates in Y
+  p32bit *FI = NULL;    // Ordinates in Z
+  p32bit *W = NULL;     // Weight
+  p32bit *LIST = NULL;  // Ordinates list
 
   // SPECTRUM VARIABLES
-  p128bit *XVALS = NULL;  // Eigenvalues in X
-  p128bit *XVECTS = NULL; // Eigenvectors in X
-  p128bit *YVALS = NULL;  // Eigenvalues in Y
-  p128bit *YVECTS = NULL; // Eigenvectors in Y
+  p32bit *XVALS = NULL;  // Eigenvalues in X
+  p32bit *XVECTS = NULL; // Eigenvectors in X
+  p32bit *YVALS = NULL;  // Eigenvalues in Y
+  p32bit *YVECTS = NULL; // Eigenvectors in Y
 
   // RESPONSE MATRIX VARIABLES
-  p128bit *RM = NULL;  // Response matrix
-  p128bit *PV = NULL;  // Particular vector
-  p128bit *FM0 = NULL; // Average flux matrix 0
-  p128bit *FM1 = NULL; // Avergae flux matrix 1
-  p128bit *SM = NULL;  // Average source vector
+  p32bit *RM = NULL;  // Response matrix
+  p32bit *PV = NULL;  // Particular vector
+  p32bit *FM0 = NULL; // Average flux matrix 0
+  p32bit *FM1 = NULL; // Avergae flux matrix 1
+  p32bit *SM = NULL;  // Average source vector
 
   // PRINCIPAL VARIABLES
-  p128bit *MFLUX = NULL;  // Escalar flux in the nodes
-  p128bit *MFLOW = NULL;  // Angular flux in the nodes
-  p128bit *XFLOW = NULL;  // Angular flux at the y edges
-  p128bit *YFLOW = NULL;  // Angular flux at the x edges
+  p32bit *MFLUX = NULL;  // Escalar flux in the nodes
+  p32bit *MFLOW = NULL;  // Angular flux in the nodes
+  p32bit *XFLOW = NULL;  // Angular flux at the y edges
+  p32bit *YFLOW = NULL;  // Angular flux at the x edges
   int ITER = -1;              // Iterations
-  p128bit cpu_time = 0.0; // CPU time
+  p32bit cpu_time = 0.0; // CPU time
 
   if (argc != 2){
     // Usage: ./RM_CN <input>
@@ -149,9 +140,6 @@ int main(int argc, char *argv[]){
     json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
     return 0;
   }
-  
-  // PRINT PROBLEM
-  print_problem(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol);
 
   // GENERATE QUADRATURE
   int M = N * (N + 2) / 2;
@@ -166,14 +154,6 @@ int main(int argc, char *argv[]){
     return 0;
   };
 
-  // PRINT QUADRATURE
-  printf("\n\n2. QUADRATURE SETUP:\n\n");
-	printf("M\t MIU\t\t THETA\t\t W\n");
-	for (int m = 0; m < M; m++) {
-		printf("%d\t% .8Lf\t% .8Lf\t% .8Lf\n", m + 1, MIU[m], THETA[m], W[m]);
-	}
-	printf("\n");
-
   // GENERATE SPECTRUM
   status = spectrum(N, MIU, THETA, LIST, W, nz, ZON, &XVALS, &XVECTS, &YVALS, &YVECTS);
   if (status != 0){
@@ -185,9 +165,6 @@ int main(int argc, char *argv[]){
                 &MFLUX, &MFLOW, &XFLOW, &YFLOW);
     return 0;
   };
-
-  // PRINT SPECTRUM
-  print_spectrum(N, nz, XVALS, XVECTS, YVALS, YVECTS);
 
   // GENERATE RESPONSE MATRIX
   status = response_matrix(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, MIU, THETA, W, XVALS, XVECTS, YVALS, YVECTS, &RM, &PV, &FM0, &FM1, &SM);
@@ -201,18 +178,6 @@ int main(int argc, char *argv[]){
     return 0;
   };
 
-  // PRINT RESPONSE MATRIZ
-  // p128bit *RAUX = NULL;
-  // printf("RM:\n");
-  // for (int ry = 0; ry < nyr; ry++){
-  //   for (int rx = 0; rx < nxr; rx++){
-  //     printf("RY = %d, RX = %d:\n", ry, rx);
-  //     RAUX = get_RM(2*M, nyr,nxr,ry,rx,RM,&RAUX);
-  //     print_matrix(4*M,RAUX);
-  //   }
-  // }
-  // free(RAUX);
-
   // ITERATIVE SCHEME
   status = rm_lln (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, W, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW, &ITER, &cpu_time);
   if (status != 0){
@@ -224,9 +189,6 @@ int main(int argc, char *argv[]){
                 &MFLUX, &MFLOW, &XFLOW, &YFLOW);
     return 0;
   };
-
-  // POST PROCESSING
-  post_processing(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, MIU, THETA, W, MFLUX, MFLOW, XFLOW, YFLOW);
 
   // JSON OUTPUTS
   json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
@@ -248,7 +210,7 @@ int main(int argc, char *argv[]){
 //////////////////////////////////////////////////////////////////////////////// IMPLEMENTATION
 
 ///////////////////////////////////////////////////////// FREE MEMORY REQUESTED
-void free_memory(p128bit **ZON, p128bit **XDOM, p128bit **YDOM, int **ZMAP, p128bit **QMAP, p128bit **MIU, p128bit **THETA, p128bit **FI, p128bit **W, p128bit **LIST, p128bit **XVALS, p128bit **XVECTS, p128bit **YVALS, p128bit **YVECTS, p128bit **RM, p128bit **PV, p128bit **FM0, p128bit **FM1, p128bit **SM, p128bit **MFLUX, p128bit **MFLOW, p128bit **XFLOW, p128bit **YFLOW){
+void free_memory(p32bit **ZON, p32bit **XDOM, p32bit **YDOM, int **ZMAP, p32bit **QMAP, p32bit **MIU, p32bit **THETA, p32bit **FI, p32bit **W, p32bit **LIST, p32bit **XVALS, p32bit **XVECTS, p32bit **YVALS, p32bit **YVECTS, p32bit **RM, p32bit **PV, p32bit **FM0, p32bit **FM1, p32bit **SM, p32bit **MFLUX, p32bit **MFLOW, p32bit **XFLOW, p32bit **YFLOW){
   
   // INPUT VARIABLES
   if (*ZON != NULL) free(*ZON); if (*XDOM != NULL) free(*XDOM); if (*YDOM != NULL) free(*YDOM); 
@@ -276,15 +238,15 @@ void free_memory(p128bit **ZON, p128bit **XDOM, p128bit **YDOM, int **ZMAP, p128
 //////////////////////////////////////////////////////// LOAD PROBLEM FROM FILE
 int input_by_txt(int *N,                  // Quadrature order
                 int *nz,                  // Number of zones
-                p128bit **ZON,        // Zone entries
+                p32bit **ZON,        // Zone entries
                 int *nxr,                 // Number of regions in X
-                p128bit **XDOM,               // X Region entries
+                p32bit **XDOM,               // X Region entries
                 int *nyr,                 // Number of regions in Y
-                p128bit **YDOM,               // Y Region entries
+                p32bit **YDOM,               // Y Region entries
                 int **ZMAP,               // Zone map
-                p128bit **QMAP,       // External source map
-                p128bit *BC,          // Boundary conditions
-                p128bit *tol,         // Tolerance
+                p32bit **QMAP,       // External source map
+                p32bit *BC,          // Boundary conditions
+                p32bit *tol,         // Tolerance
                 const char *filename      // File name to load
                 ){
 
@@ -317,7 +279,7 @@ int input_by_txt(int *N,                  // Quadrature order
 	}
 
   // ZONE FILLING
-  *ZON = malloc(sizeof(p128bit) * (*nz * 2)); if(*ZON == NULL) return 3;
+  *ZON = malloc(sizeof(p32bit) * (*nz * 2)); if(*ZON == NULL) return 3;
   double st, ss;
 	int zone_count = 0;
   for (int z = 0; z < *nz; z++){
@@ -326,7 +288,7 @@ int input_by_txt(int *N,                  // Quadrature order
           free(*ZON);
           return 2;
       }
-      (*ZON)[z * 2] = (p128bit)st; (*ZON)[z * 2 + 1] = (p128bit)ss;
+      (*ZON)[z * 2] = (p32bit)st; (*ZON)[z * 2 + 1] = (p32bit)ss;
       zone_count = zone_count + 1;
   }
 	if (zone_count != *nz){
@@ -350,7 +312,7 @@ int input_by_txt(int *N,                  // Quadrature order
 	}
 
   // REGION FILLING IN X
-  *XDOM = malloc(sizeof(p128bit) * (*nxr * 2)); 
+  *XDOM = malloc(sizeof(p32bit) * (*nxr * 2)); 
   if(*XDOM == NULL){
     free(*ZON); return 3;
   }
@@ -362,7 +324,7 @@ int input_by_txt(int *N,                  // Quadrature order
       free(*ZON); free(*XDOM);
       return 2;
     }
-    (*XDOM)[xr * 2] = (p128bit)len; (*XDOM)[xr * 2 + 1] = (p128bit)nodes;
+    (*XDOM)[xr * 2] = (p32bit)len; (*XDOM)[xr * 2 + 1] = (p32bit)nodes;
     rx_count = rx_count + 1;
   }
 	if (rx_count != *nxr){
@@ -386,7 +348,7 @@ int input_by_txt(int *N,                  // Quadrature order
 	}
 
   // REGION FILLING IN Y
-  *YDOM = malloc(sizeof(p128bit) * (*nyr * 2));
+  *YDOM = malloc(sizeof(p32bit) * (*nyr * 2));
   if(*YDOM == NULL){
     free(*ZON); free(*XDOM); return 3;
   }
@@ -397,7 +359,7 @@ int input_by_txt(int *N,                  // Quadrature order
       free(*ZON); free(*XDOM); free(*YDOM);
       return 2;
     }
-    (*YDOM)[yr * 2] = (p128bit)len; (*YDOM)[yr * 2 + 1] = (p128bit)nodes;
+    (*YDOM)[yr * 2] = (p32bit)len; (*YDOM)[yr * 2 + 1] = (p32bit)nodes;
     ry_count = ry_count + 1;
   }
 	if (ry_count != *nyr){
@@ -434,7 +396,7 @@ int input_by_txt(int *N,                  // Quadrature order
 	}
 
   // EXTERNAL SOURCE MAPPING
-	*QMAP = malloc(sizeof(p128bit) * (*nyr) * (*nxr)); 
+	*QMAP = malloc(sizeof(p32bit) * (*nyr) * (*nxr)); 
   if(*QMAP == NULL){
     free(*ZON); free(*XDOM); free(*YDOM); free(*ZMAP); return 3;
   }
@@ -448,7 +410,7 @@ int input_by_txt(int *N,                  // Quadrature order
 				free(*ZMAP); free(*QMAP);
         return 2;
 			}
-			(*QMAP)[yr * (*nxr) + xr] = (p128bit)q;
+			(*QMAP)[yr * (*nxr) + xr] = (p32bit)q;
 			entry_q_count = entry_q_count + 1;
 		}
   }
@@ -470,7 +432,7 @@ int input_by_txt(int *N,                  // Quadrature order
 			free(*ZMAP); free(*QMAP);
       return 2;
 		}
-		BC[c] = (p128bit)cond;
+		BC[c] = (p32bit)cond;
 		bc_count = bc_count + 1;
 		if (cond < 0.0 ){
 			if (cond != -1.0){
@@ -503,7 +465,7 @@ int input_by_txt(int *N,                  // Quadrature order
 		// The tolerance (TOL) must be a small number between 0.0 and 1.0
 		return 2;
 	}
-  *tol = (p128bit)dtol;
+  *tol = (p32bit)dtol;
 
 	fclose(cfPtr);
 
@@ -513,31 +475,31 @@ int input_by_txt(int *N,                  // Quadrature order
 
 /////////////////////////////////////////////////////////// GENERATE QUADRATURE
 int quad(int N,                // Quadrature order
-         p128bit **MIU,    // Ordinates in X
-         p128bit **THETA,  // Ordinates in Y
-         p128bit **FI,     // Ordinate list
-         p128bit **W,      // Weight
-         p128bit **LIST    // Ordinate list
+         p32bit **MIU,    // Ordinates in X
+         p32bit **THETA,  // Ordinates in Y
+         p32bit **FI,     // Ordinate list
+         p32bit **W,      // Weight
+         p32bit **LIST    // Ordinate list
          ){
     
   // DIRECTIONS IN THE XY PLANE
   int M = N * (N + 2) / 2;
   
   // ALLOCATE MEMORY FOR THE ORDINATES
-  *MIU = malloc(sizeof(p128bit) * M);
-  *THETA = malloc(sizeof(p128bit) * M);
-  *FI = malloc(sizeof(p128bit) * M);
-  *W = malloc(sizeof(p128bit) * M);
-  *LIST = malloc(sizeof(p128bit) * N / 2);
+  *MIU = malloc(sizeof(p32bit) * M);
+  *THETA = malloc(sizeof(p32bit) * M);
+  *FI = malloc(sizeof(p32bit) * M);
+  *W = malloc(sizeof(p32bit) * M);
+  *LIST = malloc(sizeof(p32bit) * N / 2);
   if (*MIU == NULL || *THETA == NULL || *FI == NULL || *W == NULL || *LIST == NULL) return 3;
 
   // PREFIXED VALUES
-  p128bit chi[10] = { 0.0 }, wlist[10] = { 0.0 };
+  p32bit chi[10] = { 0.0 }, wlist[10] = { 0.0 };
 	if (N == 2) {
 		chi[0] = 0.5773502692; wlist[0] = 1.0;
 	}
 	else if (N == 4) {
-		chi[0] = 0.3500212; wlist[0] = (p128bit)1/3;
+		chi[0] = 0.3500212; wlist[0] = (p32bit)1/3;
 		chi[1] = 0.8688903;
 	}
 	else if (N == 6) {
@@ -610,7 +572,7 @@ int quad(int N,                // Quadrature order
 	}
 
   // WEIGHT FILLING
-	int p = 0; p128bit aux1, aux2, aux3;
+	int p = 0; p32bit aux1, aux2, aux3;
 	for (int n = 0; n < M / 4; n++) {
 		if ((*W)[n] == 0.0) {
 			(*W)[n] = wlist[p];
@@ -671,18 +633,18 @@ int quad(int N,                // Quadrature order
 
 //////////////////////////////////////////////////////////// SPECTRUM FUNCTIONS
 void myXFunc(int N,              // Quadrature order
-             p128bit x,      // X value
-             p128bit MIU[],  // Ordinate in X
-             p128bit W[],    // Weight
-             p128bit c0,     // Scattering Ratio
-             p128bit *y)     // Y value
+             p32bit x,      // X value
+             p32bit MIU[],  // Ordinate in X
+             p32bit W[],    // Weight
+             p32bit c0,     // Scattering Ratio
+             p32bit *y)     // Y value
              {
 
   int M = N * (N + 2) / 2;
 
   (*y) = 0.0;
   for (int m = 0; m < M; m++){
-    p128bit miu = MIU[m], w = W[m];
+    p32bit miu = MIU[m], w = W[m];
     (*y) = (*y) + w / (miu + x);
   }
   (*y) = 0.25 * c0 * x * (*y) - 1;
@@ -690,18 +652,18 @@ void myXFunc(int N,              // Quadrature order
 }
 
 void myXRootFunc(int N,              // Quadrature order
-                 p128bit a,      // Left side
-                 p128bit b,      // Right side
-                 p128bit MIU[],  // Ordinate in X
-                 p128bit W[],    // Weight
-                 p128bit c0,     // Scattering ratio
-                 p128bit *root)  // Root
+                 p32bit a,      // Left side
+                 p32bit b,      // Right side
+                 p32bit MIU[],  // Ordinate in X
+                 p32bit W[],    // Weight
+                 p32bit c0,     // Scattering ratio
+                 p32bit *root)  // Root
                  {
 
-  p128bit yb;
+  p32bit yb;
   myXFunc(N, b, MIU, W, c0, &yb);
   while(fabs(b - a) > eps){
-    p128bit yc, c = 0.5 * (a + b);
+    p32bit yc, c = 0.5 * (a + b);
     myXFunc(N, c, MIU, W, c0, &yc);
     if (yc == 0.0){
       a = c;
@@ -718,18 +680,18 @@ void myXRootFunc(int N,              // Quadrature order
 }
 
 void myYFunc(int N,                // Quadrature order
-             p128bit x,        // X value
-             p128bit THETA[],  // Ordinate in Y
-             p128bit W[],      // Weight
-             p128bit c0,       // Scattering Ratio
-             p128bit *y)       // Y value
+             p32bit x,        // X value
+             p32bit THETA[],  // Ordinate in Y
+             p32bit W[],      // Weight
+             p32bit c0,       // Scattering Ratio
+             p32bit *y)       // Y value
              {
 
   int M = N * (N + 2) / 2;
 
   (*y) = 0.0;
   for (int m = 0; m < M; m++){
-    p128bit theta = THETA[m], w = W[m];
+    p32bit theta = THETA[m], w = W[m];
     (*y) = (*y) + w / (theta + x);
   }
   (*y) = 0.25 * c0 * x * (*y) - 1;
@@ -737,18 +699,18 @@ void myYFunc(int N,                // Quadrature order
 }
 
 void myYRootFunc(int N,                // Quadrature order
-                 p128bit a,        // Left side
-                 p128bit b,        // Right side
-                 p128bit THETA[],  // Ordinate in Y
-                 p128bit W[],      // Weight
-                 p128bit c0,       // Scattering ratio
-                 p128bit *root)    // Root
+                 p32bit a,        // Left side
+                 p32bit b,        // Right side
+                 p32bit THETA[],  // Ordinate in Y
+                 p32bit W[],      // Weight
+                 p32bit c0,       // Scattering ratio
+                 p32bit *root)    // Root
                  {
 
-  p128bit yb;
+  p32bit yb;
   myYFunc(N, b, THETA, W, c0, &yb);
   while(fabs(b - a) > eps){
-    p128bit yc, c = 0.5 * (a + b);
+    p32bit yc, c = 0.5 * (a + b);
     myYFunc(N, c, THETA, W, c0, &yc);
     if (yc == 0.0){
       a = c;
@@ -765,47 +727,47 @@ void myYRootFunc(int N,                // Quadrature order
 }
 
 int spectrum(int N,                // Quadrature order
-            p128bit MIU[],    // Ordinate in X
-            p128bit THETA[],  // Ordinate in Y
-            p128bit LIST[],   // Ordinate list
-            p128bit W[],      // Weight
+            p32bit MIU[],    // Ordinate in X
+            p32bit THETA[],  // Ordinate in Y
+            p32bit LIST[],   // Ordinate list
+            p32bit W[],      // Weight
             int nz,               // Number of zones
-            p128bit ZON[],    // Zone entries
-            p128bit **xvals,  // Eigenvalues in X
-            p128bit **xvects, // Eigenvectors in X
-            p128bit **yvals,  // Eigenvalues in Y
-            p128bit **yvects  // Eigenvectors in Y
+            p32bit ZON[],    // Zone entries
+            p32bit **xvals,  // Eigenvalues in X
+            p32bit **xvects, // Eigenvectors in X
+            p32bit **yvals,  // Eigenvalues in Y
+            p32bit **yvects  // Eigenvectors in Y
             ){
 
   // DIRECTIONS IN THE XY PLANE
   int M = N * (N + 2) / 2;
 
   // MEMORY ALLOCATION
-  *xvals = malloc(sizeof(p128bit) * M * nz);
-  *xvects = malloc(sizeof(p128bit) * M * M * nz);
-  *yvals = malloc(sizeof(p128bit) * M * nz);
-  *yvects = malloc(sizeof(p128bit) * M * M * nz);
+  *xvals = malloc(sizeof(p32bit) * M * nz);
+  *xvects = malloc(sizeof(p32bit) * M * M * nz);
+  *yvals = malloc(sizeof(p32bit) * M * nz);
+  *yvects = malloc(sizeof(p32bit) * M * M * nz);
   if (*xvals == NULL || *xvects == NULL || *yvals == NULL || *yvects == NULL) return 3;
 
   // AUXILIARY EIGENVALUES IN X
-  p128bit *xvals1 = NULL, *xvals2 = NULL;
-  xvals1 = malloc(sizeof(p128bit) * N);
-  xvals2 = malloc(sizeof(p128bit) * (M - N));
+  p32bit *xvals1 = NULL, *xvals2 = NULL;
+  xvals1 = malloc(sizeof(p32bit) * N);
+  xvals2 = malloc(sizeof(p32bit) * (M - N));
 
   // AUXILIARY EIGENVALUES IN Y
-  p128bit *yvals1 = NULL, *yvals2 = NULL;
-  yvals1 = malloc(sizeof(p128bit) * N);
-  yvals2 = malloc(sizeof(p128bit) * (M - N));
+  p32bit *yvals1 = NULL, *yvals2 = NULL;
+  yvals1 = malloc(sizeof(p32bit) * N);
+  yvals2 = malloc(sizeof(p32bit) * (M - N));
 
   // AUXILIARY EIGENVECTORS IN X
-  p128bit *xvects1 = NULL, *xvects2 = NULL;
-  xvects1 = malloc(sizeof(p128bit) * M * N);
-  xvects2 = malloc(sizeof(p128bit) * M * (M - N));
+  p32bit *xvects1 = NULL, *xvects2 = NULL;
+  xvects1 = malloc(sizeof(p32bit) * M * N);
+  xvects2 = malloc(sizeof(p32bit) * M * (M - N));
 
   // AUXILIARY EIGENVECTORS IN Y
-  p128bit *yvects1 = NULL, *yvects2 = NULL;
-  yvects1 = malloc(sizeof(p128bit) * M * N);
-  yvects2 = malloc(sizeof(p128bit) * M * (M - N));
+  p32bit *yvects1 = NULL, *yvects2 = NULL;
+  yvects1 = malloc(sizeof(p32bit) * M * N);
+  yvects2 = malloc(sizeof(p32bit) * M * (M - N));
 
   int *aux = NULL;
   aux = malloc(sizeof(int) * M);
@@ -821,8 +783,8 @@ int spectrum(int N,                // Quadrature order
   // BODY
   for (int z = 0; z < nz; z++){
 
-    p128bit st = ZON[z * 2], ss = ZON[z * 2 + 1];
-    p128bit c0 = ss / st;
+    p32bit st = ZON[z * 2], ss = ZON[z * 2 + 1];
+    p32bit c0 = ss / st;
 
     // EIGENVALUES
     if (c0 != 0.0){
@@ -830,7 +792,7 @@ int spectrum(int N,                // Quadrature order
       // DISPERSION LAW IN X
       for(int i = 0; i < N / 2; i++){
 
-        p128bit chi_i = LIST[i], chi_f, h, a, b, r;
+        p32bit chi_i = LIST[i], chi_f, h, a, b, r;
 
         if (i == N / 2 - 1) chi_f = 10;
         else chi_f = LIST[i + 1];
@@ -848,11 +810,11 @@ int spectrum(int N,                // Quadrature order
       int k = 0;
       for (int i = 0; i < N / 2; i++){
 
-        p128bit val = LIST[i];
+        p32bit val = LIST[i];
         int xmult = 0;
 
         for (int m = 0; m < M; m++){
-          p128bit miu = MIU[m];
+          p32bit miu = MIU[m];
           if (val == miu) xmult = xmult + 1;
         }
         xmult = xmult - 1;
@@ -868,7 +830,7 @@ int spectrum(int N,                // Quadrature order
       // DISPERSION LAW IN Y
       for(int i = 0; i < N / 2; i++){
 
-        p128bit chi_i = LIST[i], chi_f, h, a, b, r;
+        p32bit chi_i = LIST[i], chi_f, h, a, b, r;
 
         if (i == N / 2 - 1) chi_f = 10;
         else chi_f = LIST[i + 1];
@@ -886,11 +848,11 @@ int spectrum(int N,                // Quadrature order
       k = 0;
       for (int i = 0; i < N / 2; i++){
 
-        p128bit val = LIST[i];
+        p32bit val = LIST[i];
         int ymult = 0;
 
         for (int m = 0; m < M; m++){
-          p128bit theta = THETA[m];
+          p32bit theta = THETA[m];
           if (val == theta) ymult = ymult + 1;
         }
         ymult = ymult - 1;
@@ -904,7 +866,7 @@ int spectrum(int N,                // Quadrature order
       }
 
       // ORDERING EIGENVALUES
-      p128bit temp;
+      p32bit temp;
       for (int i = 0; i < N / 2; i++){
         for (int j = 0; j < N / 2; j++){
           if (xvals1[i] > xvals1[j]) {
@@ -946,7 +908,7 @@ int spectrum(int N,                // Quadrature order
     else {
 
       for (int i = 0; i < M; i++){
-        p128bit miu = MIU[i], theta = THETA[i];
+        p32bit miu = MIU[i], theta = THETA[i];
         (*xvals)[M * z + i] = - miu;
         (*yvals)[M * z + i] = - theta;
       }
@@ -959,7 +921,7 @@ int spectrum(int N,                // Quadrature order
       // EIGENVECTORS CALCULATION BY DISPERSION LAW
       for (int i = 0; i < N; i++){
         for (int m = 0; m < M; m++){
-          p128bit miu = MIU[m], theta = THETA[m];
+          p32bit miu = MIU[m], theta = THETA[m];
           xvects1[M * i + m] = 0.25 * c0 * xvals1[i] / (miu + xvals1[i]);
           yvects1[M * i + m] = 0.25 * c0 * yvals1[i] / (theta + yvals1[i]);
         }
@@ -975,13 +937,13 @@ int spectrum(int N,                // Quadrature order
       // EIGENVECTORS CALCULATION BY ZERO NORMALIZATION IN X
       for (int m = 0; m < M; m++) aux[m] = 0;
       for (int i = 0; i < (M - N); i++){
-        p128bit val = xvals2[i];
+        p32bit val = xvals2[i];
         for (int m = 0; m < M; m++){
-          p128bit mw = W[m], mmiu = MIU[m];
+          p32bit mw = W[m], mmiu = MIU[m];
           if (val == - mmiu && aux[m] == 0){
             aux[m] = 1;
             for(int n = 0; n < M; n++){
-              p128bit nw = W[n], nmiu = MIU[n];
+              p32bit nw = W[n], nmiu = MIU[n];
               if (val == - nmiu && aux[n] == 0){
                 aux[n] = 1;
                 xvects2[M * i + n] = - mw / nw;
@@ -998,13 +960,13 @@ int spectrum(int N,                // Quadrature order
       // EIGENVECTORS CALCULATION BY ZERO NORMALIZATION IN Y
       for (int m = 0; m < M; m++) aux[m] = 0;
       for (int i = 0; i < (M - N); i++){
-        p128bit val = yvals2[i];
+        p32bit val = yvals2[i];
         for (int m = 0; m < M; m++){
-          p128bit mw = W[m], mtheta = THETA[m];
+          p32bit mw = W[m], mtheta = THETA[m];
           if (val == - mtheta && aux[m] == 0){
             aux[m] = 1;
             for(int n = 0; n < M; n++){
-              p128bit nw = W[n], ntheta = THETA[n];
+              p32bit nw = W[n], ntheta = THETA[n];
               if (val == - ntheta && aux[n] == 0){
                 aux[n] = 1;
                 yvects2[M * i + n] = - mw / nw;
@@ -1063,87 +1025,15 @@ int spectrum(int N,                // Quadrature order
   return 0;
 
 }
-
-void print_spectrum(int N, int nz, p128bit XVALS[], p128bit XVECTS[], p128bit YVALS[], p128bit YVECTS[]) {
-
-  int M = N * (N + 2) / 2;
-
-  printf ("EIGENVALUES IN X:\n");
-  for (int z = 0; z < nz; z++){
-    printf("z = %d: ", z + 1);
-    for (int i = 0; i < M; i++){
-      printf("%.5Lf ", XVALS[M * z + i]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-
-  printf("EIGENVECTORS IN X:\n");
-  for (int z = 0; z < nz; z++){
-    for (int m = 0; m < M; m++){
-      for (int i = 0; i < M; i++){
-        printf("%.5Lf ", XVECTS[nz * (M * i + m) + z]);
-      }
-      printf("\n");
-    }
-    printf("\n");
-  }
-  printf("\n");
-
-  printf ("EIGENVALUES IN Y:\n");
-  for (int z = 0; z < nz; z++){
-    printf("z = %d: ", z + 1);
-    for (int i = 0; i < M; i++){
-      printf("%.5Lf ", YVALS[M * z + i]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-
-  printf("EIGENVECTORS IN Y:\n");
-  for (int z = 0; z < nz; z++){
-    for (int m = 0; m < M; m++){
-      for (int i = 0; i < M; i++){
-        printf("%.5Lf ", YVECTS[nz * (M * i + m) + z]);
-      }
-      printf("\n");
-    }
-    printf("\n");
-  }
-  printf("\n");
-
-}
 ///////////////////////////////////////////////////////////////////////////////
 
 
 ////////////////////////////////////////////////////////////// MATRIX FUNCTIONS
-void print_vector(int M, p128bit Vector[]){
 
-  for (int i = 0; i < M; i++){
-    printf("%.10Lf\n", Vector[i]);
-  }
-  printf("\n");
-
-}
-
-
-void print_matrix(int M, p128bit Matrix[]){
-
-  for (int j = 0; j < M; j++){
-    for (int i = 0; i < M; i++){
-      printf("%.3Le ", Matrix[M * j + i]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-
-}
-
-
-p128bit* zeros(int M, p128bit **OUTPUT){
+p32bit* zeros(int M, p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
   for (int j = 0; j < M; j++){
@@ -1157,10 +1047,10 @@ p128bit* zeros(int M, p128bit **OUTPUT){
 }
 
 
-p128bit* eye(int M, p128bit **OUTPUT){
+p32bit* eye(int M, p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
   for (int j = 0; j < M; j++){
@@ -1175,10 +1065,10 @@ p128bit* eye(int M, p128bit **OUTPUT){
 }
 
 
-p128bit* equal(int M, p128bit Matrix[], p128bit **OUTPUT){
+p32bit* equal(int M, p32bit Matrix[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
   
   for (int j = 0; j < M; j++){
@@ -1192,10 +1082,10 @@ p128bit* equal(int M, p128bit Matrix[], p128bit **OUTPUT){
 }
 
 
-p128bit* vector_neg(int M, p128bit VECTOR[], p128bit **OUTPUT){
+p32bit* vector_neg(int M, p32bit VECTOR[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M);
   }
 
   for (int i = 0; i < M; i++){
@@ -1208,10 +1098,10 @@ p128bit* vector_neg(int M, p128bit VECTOR[], p128bit **OUTPUT){
 }
 
 
-p128bit* matrix_neg(int M, p128bit Matrix[], p128bit **OUTPUT){
+p32bit* matrix_neg(int M, p32bit Matrix[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
   for (int j = 0; j < M; j++){
@@ -1226,10 +1116,10 @@ p128bit* matrix_neg(int M, p128bit Matrix[], p128bit **OUTPUT){
 }
 
 
-p128bit* vector_sum(int M, p128bit Vector1[], p128bit Vector2[], p128bit **OUTPUT){
+p32bit* vector_sum(int M, p32bit Vector1[], p32bit Vector2[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M);
   }
 
   for (int i = 0; i < M; i++){
@@ -1242,10 +1132,10 @@ p128bit* vector_sum(int M, p128bit Vector1[], p128bit Vector2[], p128bit **OUTPU
 }
 
 
-p128bit* matrix_sum(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUTPUT){
+p32bit* matrix_sum(int M, p32bit Matrix1[], p32bit Matrix2[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
   for (int j = 0; j < M; j++){
@@ -1260,13 +1150,13 @@ p128bit* matrix_sum(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUTPU
 }
 
 
-p128bit* matrix_mult1(int M, p128bit Matrix[], p128bit X[], p128bit **OUTPUT){
+p32bit* matrix_mult1(int M, p32bit Matrix[], p32bit X[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M);
   }
 
-  p128bit sum;
+  p32bit sum;
 
   for (int j = 0; j < M; j++){
     sum = 0.0;
@@ -1282,13 +1172,13 @@ p128bit* matrix_mult1(int M, p128bit Matrix[], p128bit X[], p128bit **OUTPUT){
 }
 
 
-p128bit* matrix_mult2(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUTPUT){
+p32bit* matrix_mult2(int M, p32bit Matrix1[], p32bit Matrix2[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
-  p128bit sum;
+  p32bit sum;
 
   for (int k = 0; k < M; k++) {
     for (int j = 0; j < M; j++){
@@ -1306,10 +1196,10 @@ p128bit* matrix_mult2(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUT
 }
 
 
-p128bit* matrix_mult3(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUTPUT){
+p32bit* matrix_mult3(int M, p32bit Matrix1[], p32bit Matrix2[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
   for (int k = 0; k < M; k++) {
@@ -1324,19 +1214,19 @@ p128bit* matrix_mult3(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit **OUT
 }
 
 
-int inv(int M, p128bit Matrix[], p128bit **OUTPUT){
+int inv(int M, p32bit Matrix[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
   int p;
-  p128bit val, m;
+  p32bit val, m;
 
-  p128bit *temp = NULL, *IDEN = NULL, *Matrix2 = NULL;
-  temp = malloc(sizeof(p128bit) * M);
-  IDEN = malloc(sizeof(p128bit) * M * M);
-  Matrix2 = malloc(sizeof(p128bit) * M * M);
+  p32bit *temp = NULL, *IDEN = NULL, *Matrix2 = NULL;
+  temp = malloc(sizeof(p32bit) * M);
+  IDEN = malloc(sizeof(p32bit) * M * M);
+  Matrix2 = malloc(sizeof(p32bit) * M * M);
   if (temp == NULL || IDEN == NULL || Matrix2 == NULL){
     free(temp); free(IDEN); free(Matrix2); return 3;
   }
@@ -1386,7 +1276,7 @@ int inv(int M, p128bit Matrix[], p128bit **OUTPUT){
   }
 
   // BACK SUBSTITUTION
-  p128bit sum;
+  p32bit sum;
   for (int k = 0; k < M; k++){
     (*OUTPUT)[M * (M - 1) + k] = IDEN[M * (M - 1) + k] / Matrix2[M * M - 1];
     for (int j = M - 2; j >= 0; j--){
@@ -1404,10 +1294,10 @@ int inv(int M, p128bit Matrix[], p128bit **OUTPUT){
   return 0;
 }
 
-p128bit* vector_concat(int M, p128bit V1[], p128bit V2[], p128bit **OUTPUT){
+p32bit* vector_concat(int M, p32bit V1[], p32bit V2[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * 2 * M);
+    *OUTPUT = malloc(sizeof(p32bit) * 2 * M);
   }
 
   for (int i = 0; i < M; i++){
@@ -1423,10 +1313,10 @@ p128bit* vector_concat(int M, p128bit V1[], p128bit V2[], p128bit **OUTPUT){
 }
 
 
-p128bit* matrix_concat(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit Matrix3[], p128bit Matrix4[], p128bit **OUTPUT){
+p32bit* matrix_concat(int M, p32bit Matrix1[], p32bit Matrix2[], p32bit Matrix3[], p32bit Matrix4[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * 4 * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * 4 * M * M);
   }
 
   for (int j = 0; j < M; j++){
@@ -1455,140 +1345,140 @@ p128bit* matrix_concat(int M, p128bit Matrix1[], p128bit Matrix2[], p128bit Matr
 ////////////////////////////////////////////////////// RESPONSE MATRIX FUNCTION
 int response_matrix(int N,               // Quadrature order
                      int nz,              // Number of zones
-                     p128bit ZON[],   // Zone entries
+                     p32bit ZON[],   // Zone entries
                      int nxr,             // Number of regions in X
-                     p128bit XDOM[],  // X region entries
+                     p32bit XDOM[],  // X region entries
                      int nyr,             // Number of regions in Y
-                     p128bit YDOM[],  // Y regions entries
+                     p32bit YDOM[],  // Y regions entries
                      int ZMAP[],          // Zone mapping
-                     p128bit QMAP[],  // External source mapping
-                     p128bit MIU[],   // Ordinates in X
-                     p128bit THETA[], // Ordinates in Y
-                     p128bit W[],     // Weight
-                     p128bit XVALS[], // Eigenvalues of X
-                     p128bit XVECTS[],// Eigenvectors of X 
-                     p128bit YVALS[], // Eigenvalues of Y
-                     p128bit YVECTS[],// Eigenvectors of Y
-                     p128bit **RM,    // Response matrix
-                     p128bit **PV,    // Particular vector
-                     p128bit **FM0,   // Average flux matrix 0
-                     p128bit **FM1,   // Average flux matrix 1
-                     p128bit **SM     // Average Source
+                     p32bit QMAP[],  // External source mapping
+                     p32bit MIU[],   // Ordinates in X
+                     p32bit THETA[], // Ordinates in Y
+                     p32bit W[],     // Weight
+                     p32bit XVALS[], // Eigenvalues of X
+                     p32bit XVECTS[],// Eigenvectors of X 
+                     p32bit YVALS[], // Eigenvalues of Y
+                     p32bit YVECTS[],// Eigenvectors of Y
+                     p32bit **RM,    // Response matrix
+                     p32bit **PV,    // Particular vector
+                     p32bit **FM0,   // Average flux matrix 0
+                     p32bit **FM1,   // Average flux matrix 1
+                     p32bit **SM     // Average Source
                      ){
   
   int M = N * (N + 2) / 2;
   int vcond = 0;
-  p128bit landa, gama;
+  p32bit landa, gama;
 
   // OUTPUT MATRICES
-  *RM = malloc(sizeof(p128bit) * 16 * M * M * nyr * nxr);
-  *PV = malloc(sizeof(p128bit) * 4 * M * nyr * nxr);
-  *FM0 = malloc(sizeof(p128bit) * M * M * nyr * nxr);
-  *FM1 = malloc(sizeof(p128bit) * M * M * nyr * nxr);
-  *SM = malloc(sizeof(p128bit) * M * nyr * nxr);
+  *RM = malloc(sizeof(p32bit) * 16 * M * M * nyr * nxr);
+  *PV = malloc(sizeof(p32bit) * 4 * M * nyr * nxr);
+  *FM0 = malloc(sizeof(p32bit) * M * M * nyr * nxr);
+  *FM1 = malloc(sizeof(p32bit) * M * M * nyr * nxr);
+  *SM = malloc(sizeof(p32bit) * M * nyr * nxr);
   if(*RM == NULL || *PV == NULL || *FM0 == NULL || *FM1 == NULL || *SM == NULL) return 3;
 
   // AUXILIARY MATRICES
-  p128bit *RXIN = NULL, *RXOUT = NULL, *SX = NULL, *FX0 = NULL, *FX1IN = NULL, *FX1OUT = NULL, *AX0 = NULL, *AX1_PLUS = NULL, *AX1_MINUS = NULL;
-  RXIN = malloc(sizeof(p128bit) * M * M);
-  RXOUT = malloc(sizeof(p128bit) * M * M);
-  SX = malloc(sizeof(p128bit) * M); 
-  FX0 = malloc(sizeof(p128bit) * M * M);
-  FX1IN = malloc(sizeof(p128bit) * M * M);
-  FX1OUT = malloc(sizeof(p128bit) * M * M);
-  AX0 = malloc(sizeof(p128bit) * M * M);
-  AX1_PLUS = malloc(sizeof(p128bit) * M * M);
-  AX1_MINUS = malloc(sizeof(p128bit) * M * M);
+  p32bit *RXIN = NULL, *RXOUT = NULL, *SX = NULL, *FX0 = NULL, *FX1IN = NULL, *FX1OUT = NULL, *AX0 = NULL, *AX1_PLUS = NULL, *AX1_MINUS = NULL;
+  RXIN = malloc(sizeof(p32bit) * M * M);
+  RXOUT = malloc(sizeof(p32bit) * M * M);
+  SX = malloc(sizeof(p32bit) * M); 
+  FX0 = malloc(sizeof(p32bit) * M * M);
+  FX1IN = malloc(sizeof(p32bit) * M * M);
+  FX1OUT = malloc(sizeof(p32bit) * M * M);
+  AX0 = malloc(sizeof(p32bit) * M * M);
+  AX1_PLUS = malloc(sizeof(p32bit) * M * M);
+  AX1_MINUS = malloc(sizeof(p32bit) * M * M);
 
-  p128bit *RYIN = NULL, *RYOUT = NULL, *SY = NULL, *FY0 = NULL, *FY1IN = NULL, *FY1OUT = NULL, *AY0 = NULL, *AY1_PLUS = NULL, *AY1_MINUS = NULL;
-  RYIN = malloc(sizeof(p128bit) * M * M);
-  RYOUT = malloc(sizeof(p128bit) * M * M);
-  SY = malloc(sizeof(p128bit) * M); 
-  FY0 = malloc(sizeof(p128bit) * M * M);
-  FY1IN = malloc(sizeof(p128bit) * M * M);
-  FY1OUT = malloc(sizeof(p128bit) * M * M);
-  AY0 = malloc(sizeof(p128bit) * M * M);
-  AY1_PLUS = malloc(sizeof(p128bit) * M * M);
-  AY1_MINUS = malloc(sizeof(p128bit) * M * M);
+  p32bit *RYIN = NULL, *RYOUT = NULL, *SY = NULL, *FY0 = NULL, *FY1IN = NULL, *FY1OUT = NULL, *AY0 = NULL, *AY1_PLUS = NULL, *AY1_MINUS = NULL;
+  RYIN = malloc(sizeof(p32bit) * M * M);
+  RYOUT = malloc(sizeof(p32bit) * M * M);
+  SY = malloc(sizeof(p32bit) * M); 
+  FY0 = malloc(sizeof(p32bit) * M * M);
+  FY1IN = malloc(sizeof(p32bit) * M * M);
+  FY1OUT = malloc(sizeof(p32bit) * M * M);
+  AY0 = malloc(sizeof(p32bit) * M * M);
+  AY1_PLUS = malloc(sizeof(p32bit) * M * M);
+  AY1_MINUS = malloc(sizeof(p32bit) * M * M);
 
-  p128bit *SXX = NULL, *XNABLA = NULL, *XF0 = NULL, *XF1 = NULL, *FXX0 = NULL, *FXX1IN = NULL, *FXX1OUT = NULL, *FXX3 = NULL, *FXX4IN = NULL, *FXX4OUT = NULL;
-  p128bit *AXX0 = NULL, *AXX1_PLUS = NULL, *AXX1_MINUS = NULL, *AXX3 = NULL, *AXX4_PLUS = NULL, *AXX4_MINUS = NULL;
+  p32bit *SXX = NULL, *XNABLA = NULL, *XF0 = NULL, *XF1 = NULL, *FXX0 = NULL, *FXX1IN = NULL, *FXX1OUT = NULL, *FXX3 = NULL, *FXX4IN = NULL, *FXX4OUT = NULL;
+  p32bit *AXX0 = NULL, *AXX1_PLUS = NULL, *AXX1_MINUS = NULL, *AXX3 = NULL, *AXX4_PLUS = NULL, *AXX4_MINUS = NULL;
 
-  SXX = malloc(sizeof(p128bit) * M);
-  XNABLA = malloc(sizeof(p128bit) * M * M);
-  XF0 = malloc(sizeof(p128bit) * M * M);
-  XF1 = malloc(sizeof(p128bit) * M * M);
-  FXX0 = malloc(sizeof(p128bit) * M * M);
-  FXX1IN = malloc(sizeof(p128bit) * M * M);
-  FXX1OUT = malloc(sizeof(p128bit) * M * M);
-  FXX3 = malloc(sizeof(p128bit) * M * M);
-  FXX4IN = malloc(sizeof(p128bit) * M * M);
-  FXX4OUT = malloc(sizeof(p128bit) * M * M);
-  AXX0 = malloc(sizeof(p128bit) * M * M);
-  AXX1_PLUS = malloc(sizeof(p128bit) * M * M);
-  AXX1_MINUS = malloc(sizeof(p128bit) * M * M);
-  AXX3 = malloc(sizeof(p128bit) * M * M);
-  AXX4_PLUS = malloc(sizeof(p128bit) * M * M);
-  AXX4_MINUS = malloc(sizeof(p128bit) * M * M);
+  SXX = malloc(sizeof(p32bit) * M);
+  XNABLA = malloc(sizeof(p32bit) * M * M);
+  XF0 = malloc(sizeof(p32bit) * M * M);
+  XF1 = malloc(sizeof(p32bit) * M * M);
+  FXX0 = malloc(sizeof(p32bit) * M * M);
+  FXX1IN = malloc(sizeof(p32bit) * M * M);
+  FXX1OUT = malloc(sizeof(p32bit) * M * M);
+  FXX3 = malloc(sizeof(p32bit) * M * M);
+  FXX4IN = malloc(sizeof(p32bit) * M * M);
+  FXX4OUT = malloc(sizeof(p32bit) * M * M);
+  AXX0 = malloc(sizeof(p32bit) * M * M);
+  AXX1_PLUS = malloc(sizeof(p32bit) * M * M);
+  AXX1_MINUS = malloc(sizeof(p32bit) * M * M);
+  AXX3 = malloc(sizeof(p32bit) * M * M);
+  AXX4_PLUS = malloc(sizeof(p32bit) * M * M);
+  AXX4_MINUS = malloc(sizeof(p32bit) * M * M);
 
-  p128bit *SYY = NULL, *YNABLA = NULL, *YF0 = NULL, *YF1 = NULL, *FYY0 = NULL, *FYY1IN = NULL, *FYY1OUT = NULL, *FYY3 = NULL, *FYY4IN = NULL, *FYY4OUT = NULL;
-  p128bit *AYY0 = NULL, *AYY1_PLUS = NULL, *AYY1_MINUS = NULL, *AYY3 = NULL, *AYY4_PLUS = NULL, *AYY4_MINUS = NULL;
+  p32bit *SYY = NULL, *YNABLA = NULL, *YF0 = NULL, *YF1 = NULL, *FYY0 = NULL, *FYY1IN = NULL, *FYY1OUT = NULL, *FYY3 = NULL, *FYY4IN = NULL, *FYY4OUT = NULL;
+  p32bit *AYY0 = NULL, *AYY1_PLUS = NULL, *AYY1_MINUS = NULL, *AYY3 = NULL, *AYY4_PLUS = NULL, *AYY4_MINUS = NULL;
 
-  SYY = malloc(sizeof(p128bit) * M);
-  YNABLA = malloc(sizeof(p128bit) * M * M);
-  YF0 = malloc(sizeof(p128bit) * M * M);
-  YF1 = malloc(sizeof(p128bit) * M * M);
-  FYY0 = malloc(sizeof(p128bit) * M * M);
-  FYY1IN = malloc(sizeof(p128bit) * M * M);
-  FYY1OUT = malloc(sizeof(p128bit) * M * M);
-  FYY3 = malloc(sizeof(p128bit) * M * M);
-  FYY4IN = malloc(sizeof(p128bit) * M * M);
-  FYY4OUT = malloc(sizeof(p128bit) * M * M);
-  AYY0 = malloc(sizeof(p128bit) * M * M);
-  AYY1_PLUS = malloc(sizeof(p128bit) * M * M);
-  AYY1_MINUS = malloc(sizeof(p128bit) * M * M);
-  AYY3 = malloc(sizeof(p128bit) * M * M);
-  AYY4_PLUS = malloc(sizeof(p128bit) * M * M);
-  AYY4_MINUS = malloc(sizeof(p128bit) * M * M);
+  SYY = malloc(sizeof(p32bit) * M);
+  YNABLA = malloc(sizeof(p32bit) * M * M);
+  YF0 = malloc(sizeof(p32bit) * M * M);
+  YF1 = malloc(sizeof(p32bit) * M * M);
+  FYY0 = malloc(sizeof(p32bit) * M * M);
+  FYY1IN = malloc(sizeof(p32bit) * M * M);
+  FYY1OUT = malloc(sizeof(p32bit) * M * M);
+  FYY3 = malloc(sizeof(p32bit) * M * M);
+  FYY4IN = malloc(sizeof(p32bit) * M * M);
+  FYY4OUT = malloc(sizeof(p32bit) * M * M);
+  AYY0 = malloc(sizeof(p32bit) * M * M);
+  AYY1_PLUS = malloc(sizeof(p32bit) * M * M);
+  AYY1_MINUS = malloc(sizeof(p32bit) * M * M);
+  AYY3 = malloc(sizeof(p32bit) * M * M);
+  AYY4_PLUS = malloc(sizeof(p32bit) * M * M);
+  AYY4_MINUS = malloc(sizeof(p32bit) * M * M);
 
-  p128bit *LAMBDA_XIN = NULL, *LAMBDA_XOUT = NULL, *GAMA_XIN = NULL, *GAMA_XOUT = NULL;
-  p128bit *LAMBDA_YIN = NULL, *LAMBDA_YOUT = NULL, *GAMA_YIN = NULL, *GAMA_YOUT = NULL;
-  p128bit *AUX1 = NULL, *AUX2 = NULL, *AUX3 = NULL;
-  LAMBDA_XIN = malloc(sizeof(p128bit) * M * M);
-  LAMBDA_XOUT = malloc(sizeof(p128bit) * M * M);
-  GAMA_XIN = malloc(sizeof(p128bit) * M * M);
-  GAMA_XOUT = malloc(sizeof(p128bit) * M * M);
-  LAMBDA_YIN = malloc(sizeof(p128bit) * M * M);
-  LAMBDA_YOUT = malloc(sizeof(p128bit) * M * M);
-  GAMA_YIN = malloc(sizeof(p128bit) * M * M);
-  GAMA_YOUT = malloc(sizeof(p128bit) * M * M);
-  AUX1 = malloc(sizeof(p128bit) * M * M);
-  AUX2 = malloc(sizeof(p128bit) * M * M);
-  AUX3 = malloc(sizeof(p128bit) * M * M);
+  p32bit *LAMBDA_XIN = NULL, *LAMBDA_XOUT = NULL, *GAMA_XIN = NULL, *GAMA_XOUT = NULL;
+  p32bit *LAMBDA_YIN = NULL, *LAMBDA_YOUT = NULL, *GAMA_YIN = NULL, *GAMA_YOUT = NULL;
+  p32bit *AUX1 = NULL, *AUX2 = NULL, *AUX3 = NULL;
+  LAMBDA_XIN = malloc(sizeof(p32bit) * M * M);
+  LAMBDA_XOUT = malloc(sizeof(p32bit) * M * M);
+  GAMA_XIN = malloc(sizeof(p32bit) * M * M);
+  GAMA_XOUT = malloc(sizeof(p32bit) * M * M);
+  LAMBDA_YIN = malloc(sizeof(p32bit) * M * M);
+  LAMBDA_YOUT = malloc(sizeof(p32bit) * M * M);
+  GAMA_YIN = malloc(sizeof(p32bit) * M * M);
+  GAMA_YOUT = malloc(sizeof(p32bit) * M * M);
+  AUX1 = malloc(sizeof(p32bit) * M * M);
+  AUX2 = malloc(sizeof(p32bit) * M * M);
+  AUX3 = malloc(sizeof(p32bit) * M * M);
 
-  p128bit *RXIN_INV = NULL, *RYIN_INV = NULL, *M1 = NULL, *M2 = NULL, *M3 = NULL, *M4 = NULL, *MM1 = NULL, *MM2 = NULL, *MM3 = NULL, *MM4 = NULL, *IN = NULL, *OUT = NULL, *OUT_INV = NULL;
-  RXIN_INV = malloc(sizeof(p128bit) * M * M);
-  RYIN_INV = malloc(sizeof(p128bit) * M * M);
-  M1 = malloc(sizeof(p128bit) * M * M);
-  M2 = malloc(sizeof(p128bit) * M * M);
-  M3 = malloc(sizeof(p128bit) * M * M);
-  M4 = malloc(sizeof(p128bit) * M * M);
-  MM1 = malloc(sizeof(p128bit) * 4 * M * M);
-  MM2 = malloc(sizeof(p128bit) * 4 * M * M);
-  MM3 = malloc(sizeof(p128bit) * 4 * M * M);
-  MM4 = malloc(sizeof(p128bit) * 4 * M * M);
-  IN = malloc(sizeof(p128bit) * 16 * M * M);
-  OUT = malloc(sizeof(p128bit) * 16 * M * M);
-  OUT_INV = malloc(sizeof(p128bit) * 16 * M * M);
+  p32bit *RXIN_INV = NULL, *RYIN_INV = NULL, *M1 = NULL, *M2 = NULL, *M3 = NULL, *M4 = NULL, *MM1 = NULL, *MM2 = NULL, *MM3 = NULL, *MM4 = NULL, *IN = NULL, *OUT = NULL, *OUT_INV = NULL;
+  RXIN_INV = malloc(sizeof(p32bit) * M * M);
+  RYIN_INV = malloc(sizeof(p32bit) * M * M);
+  M1 = malloc(sizeof(p32bit) * M * M);
+  M2 = malloc(sizeof(p32bit) * M * M);
+  M3 = malloc(sizeof(p32bit) * M * M);
+  M4 = malloc(sizeof(p32bit) * M * M);
+  MM1 = malloc(sizeof(p32bit) * 4 * M * M);
+  MM2 = malloc(sizeof(p32bit) * 4 * M * M);
+  MM3 = malloc(sizeof(p32bit) * 4 * M * M);
+  MM4 = malloc(sizeof(p32bit) * 4 * M * M);
+  IN = malloc(sizeof(p32bit) * 16 * M * M);
+  OUT = malloc(sizeof(p32bit) * 16 * M * M);
+  OUT_INV = malloc(sizeof(p32bit) * 16 * M * M);
 
-  p128bit *VAUX1 = NULL, *VAUX2 = NULL, *VAUX3 = NULL, *V1 = NULL, *V2 = NULL, *IND1 = NULL, *IND2 = NULL;
-  VAUX1 = malloc(sizeof(p128bit) * M);
-  VAUX2 = malloc(sizeof(p128bit) * M);
-  VAUX3 = malloc(sizeof(p128bit) * M);
-  V1 = malloc(sizeof(p128bit) * 2 * M);
-  V2 = malloc(sizeof(p128bit) * 2 * M);
-  IND1 = malloc(sizeof(p128bit) * 4 * M);
-  IND2 = malloc(sizeof(p128bit) * 4 * M);
+  p32bit *VAUX1 = NULL, *VAUX2 = NULL, *VAUX3 = NULL, *V1 = NULL, *V2 = NULL, *IND1 = NULL, *IND2 = NULL;
+  VAUX1 = malloc(sizeof(p32bit) * M);
+  VAUX2 = malloc(sizeof(p32bit) * M);
+  VAUX3 = malloc(sizeof(p32bit) * M);
+  V1 = malloc(sizeof(p32bit) * 2 * M);
+  V2 = malloc(sizeof(p32bit) * 2 * M);
+  IND1 = malloc(sizeof(p32bit) * 4 * M);
+  IND2 = malloc(sizeof(p32bit) * 4 * M);
   
   if(RXIN == NULL || RXOUT == NULL || SX == NULL || FX0 == NULL || FX1IN == NULL || FX1OUT == NULL || AX0 == NULL || AX1_PLUS == NULL || AX1_MINUS == NULL ||
      RYIN == NULL || RYOUT == NULL || SY == NULL || FY0 == NULL || FY1IN == NULL || FY1OUT == NULL || AY0 == NULL || AY1_PLUS == NULL || AY1_MINUS == NULL ||
@@ -1642,15 +1532,15 @@ int response_matrix(int N,               // Quadrature order
 
   // AUXILIARY VARIABLES
   int ntcx, ntcy, z;
-  p128bit lenx, leny, hx, hy, st, ss, c0, Q;
-  p128bit m_miu, m_theta, k_miu, k_theta, k_w;
+  p32bit lenx, leny, hx, hy, st, ss, c0, Q;
+  p32bit m_miu, m_theta, k_miu, k_theta, k_w;
 
   for (int ry = 0; ry < nyr; ry++){
     for (int rx = 0; rx < nxr; rx++){
 
       // AUXILIARY VARIABLES
-      lenx = XDOM[rx * 2]; ntcx = (int)XDOM[rx * 2 + 1]; hx = (p128bit)(lenx / ntcx);
-      leny = YDOM[ry * 2]; ntcy = (int)YDOM[ry * 2 + 1]; hy = (p128bit)(leny / ntcy);
+      lenx = XDOM[rx * 2]; ntcx = (int)XDOM[rx * 2 + 1]; hx = (p32bit)(lenx / ntcx);
+      leny = YDOM[ry * 2]; ntcy = (int)YDOM[ry * 2 + 1]; hy = (p32bit)(leny / ntcy);
       z = ZMAP[nxr * ry + rx]; st = ZON[z * 2]; ss = ZON[z * 2 + 1]; c0 = ss / st;
       Q = QMAP[nxr * ry + rx];
 
@@ -1660,7 +1550,7 @@ int response_matrix(int N,               // Quadrature order
 
         // AVERAGE FLUX MATRICES
         (*SM)[nyr * (M*rx + m) + ry] = Q * (1 + c0 / (1 - c0)) / st;
-        p128bit k_miu, k_theta, k_w;
+        p32bit k_miu, k_theta, k_w;
         for (int k = 0; k < M; k++){
           k_miu = MIU[k]; k_theta = THETA[k]; k_w = W[k];
           (*FM0)[nyr * (nxr * (M * m + k) + rx) + ry] = 0.25 * c0 * k_w * k_miu / (st * hx * (1 - c0));
@@ -2910,10 +2800,10 @@ int response_matrix(int N,               // Quadrature order
 }
 
 
-p128bit* get_RM(int M, int nyr, int nxr, int ry, int rx, p128bit RM[], p128bit **OUTPUT){
+p32bit* get_RM(int M, int nyr, int nxr, int ry, int rx, p32bit RM[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * 4 * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * 4 * M * M);
   }
 
   for (int j = 0; j < 2 * M; j++){
@@ -2929,10 +2819,10 @@ p128bit* get_RM(int M, int nyr, int nxr, int ry, int rx, p128bit RM[], p128bit *
 }
 
 
-p128bit* get_PV(int M, int nyr, int nxr, int ry, int rx, p128bit PV[], p128bit **OUTPUT){
+p32bit* get_PV(int M, int nyr, int nxr, int ry, int rx, p32bit PV[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * 2 * M);
+    *OUTPUT = malloc(sizeof(p32bit) * 2 * M);
   }
 
   for (int i = 0; i < 2 * M; i++){
@@ -2946,10 +2836,10 @@ p128bit* get_PV(int M, int nyr, int nxr, int ry, int rx, p128bit PV[], p128bit *
 }
 
 
-p128bit* get_FM0(int M, int nyr, int nxr, int ry, int rx, p128bit FM0[], p128bit **OUTPUT){
+p32bit* get_FM0(int M, int nyr, int nxr, int ry, int rx, p32bit FM0[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
   for (int j = 0; j < M; j++){
@@ -2965,10 +2855,10 @@ p128bit* get_FM0(int M, int nyr, int nxr, int ry, int rx, p128bit FM0[], p128bit
 }
 
 
-p128bit* get_FM1(int M, int nyr, int nxr, int ry, int rx, p128bit FM1[], p128bit **OUTPUT){
+p32bit* get_FM1(int M, int nyr, int nxr, int ry, int rx, p32bit FM1[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M * M);
   }
 
   for (int j = 0; j < M; j++){
@@ -2983,10 +2873,10 @@ p128bit* get_FM1(int M, int nyr, int nxr, int ry, int rx, p128bit FM1[], p128bit
 
 }
 
-p128bit* get_SM(int M, int nyr, int nxr, int ry, int rx, p128bit SM[], p128bit **OUTPUT){
+p32bit* get_SM(int M, int nyr, int nxr, int ry, int rx, p32bit SM[], p32bit **OUTPUT){
 
   if ((*OUTPUT) == NULL){
-    *OUTPUT = malloc(sizeof(p128bit) * M);
+    *OUTPUT = malloc(sizeof(p32bit) * M);
   }
 
   for (int i = 0; i < M; i++){
@@ -3004,27 +2894,27 @@ p128bit* get_SM(int M, int nyr, int nxr, int ry, int rx, p128bit SM[], p128bit *
 //////////////////////////////////////////////////////// RM_CN ITERATIVE SCHEME
 int rm_lln (int N,               // Quadrature order
            int nz,              // Number of zones
-           p128bit ZON[],   // Zone entries
+           p32bit ZON[],   // Zone entries
            int nxr,             // Number of regions in X
-           p128bit XDOM[],  // X Region entries
+           p32bit XDOM[],  // X Region entries
            int nyr,             // Number of regions in Y
-           p128bit YDOM[],  // Y Region entries
+           p32bit YDOM[],  // Y Region entries
            int ZMAP[],          // Zone map
-           p128bit QMAP[],  // External source map
-           p128bit BC[],    // Boundary conditions
-           p128bit tol,     // Tolerance
-           p128bit W[],     // Quadrature weight
-           p128bit RM[],    // Response matrix
-           p128bit PV[],    // Source vector
-           p128bit FM0[],   // Average flux matrix 0
-           p128bit FM1[],   // Average flux matrix 1
-           p128bit SM[],    // Average source vector
-           p128bit **MFLUX, // Escalar flux in the nodes
-           p128bit **MFLOW, // Angular flux in the nodes
-           p128bit **XFLOW, // Angular flux at the y edges
-           p128bit **YFLOW, // Angular flux at the x edges
+           p32bit QMAP[],  // External source map
+           p32bit BC[],    // Boundary conditions
+           p32bit tol,     // Tolerance
+           p32bit W[],     // Quadrature weight
+           p32bit RM[],    // Response matrix
+           p32bit PV[],    // Source vector
+           p32bit FM0[],   // Average flux matrix 0
+           p32bit FM1[],   // Average flux matrix 1
+           p32bit SM[],    // Average source vector
+           p32bit **MFLUX, // Escalar flux in the nodes
+           p32bit **MFLOW, // Angular flux in the nodes
+           p32bit **XFLOW, // Angular flux at the y edges
+           p32bit **YFLOW, // Angular flux at the x edges
            int *ITER,            // Iteration
-           p128bit *cpu_time // CPU time
+           p32bit *cpu_time // CPU time
            ){
 
   // INITIALIZATION
@@ -3036,15 +2926,15 @@ int rm_lln (int N,               // Quadrature order
 		ntc_y = ntc_y + (int)YDOM[2 * ry + 1];
 	}
   int M = N * (N + 2) / 2;
-  *MFLUX = malloc(sizeof(p128bit) * (ntc_y * ntc_x));
-	*MFLOW = malloc(sizeof(p128bit) * (ntc_y * ntc_x) * M);
-	*XFLOW = malloc(sizeof(p128bit) * (ntc_y * (ntc_x + 1)) * M);
-	*YFLOW = malloc(sizeof(p128bit) * ((ntc_y + 1) * ntc_x) * M);
+  *MFLUX = malloc(sizeof(p32bit) * (ntc_y * ntc_x));
+	*MFLOW = malloc(sizeof(p32bit) * (ntc_y * ntc_x) * M);
+	*XFLOW = malloc(sizeof(p32bit) * (ntc_y * (ntc_x + 1)) * M);
+	*YFLOW = malloc(sizeof(p32bit) * ((ntc_y + 1) * ntc_x) * M);
   if (*MFLUX == NULL || *MFLOW == NULL || *XFLOW == NULL || *YFLOW == NULL) return 3;
 
-  p128bit *XXFLOW = NULL, *YYFLOW = NULL;
-  XXFLOW = malloc(sizeof(p128bit) * (ntc_y * (ntc_x + 1)) * M);
-  YYFLOW = malloc(sizeof(p128bit) * (ntc_y * (ntc_x + 1)) * M);
+  p32bit *XXFLOW = NULL, *YYFLOW = NULL;
+  XXFLOW = malloc(sizeof(p32bit) * (ntc_y * (ntc_x + 1)) * M);
+  YYFLOW = malloc(sizeof(p32bit) * (ntc_y * (ntc_x + 1)) * M);
   if (XXFLOW == NULL || YYFLOW == NULL){
     if (XXFLOW != NULL) free(XXFLOW); if (YYFLOW != NULL) free(YYFLOW);
     return 3;
@@ -3089,26 +2979,26 @@ int rm_lln (int N,               // Quadrature order
 
   // VARIABLES
   clock_t start, end;
-  p128bit ERR = 1.0;
+  p32bit ERR = 1.0;
   int j_b, j_f, i_b, i_f;
   int nc_y, nc_x;
-  p128bit *IN = NULL, *OUT = NULL; 
-  p128bit *RESP_MATRIX = NULL, *PART_VECTOR = NULL, *V_AUX = NULL;
-  IN = malloc(sizeof(p128bit) * 4 * M);
-  OUT = malloc(sizeof(p128bit) * 4 * M);
-  RESP_MATRIX = malloc(sizeof(p128bit) * 16 * M * M);
-  PART_VECTOR = malloc(sizeof(p128bit) * 4 * M);
-  V_AUX = malloc(sizeof(p128bit) * 4 * M);
-  p128bit *X_VECTOR = NULL, *Y_VECTOR = NULL, *M_VECTOR = NULL, *V_AUX2 = NULL;
-  p128bit *FM_0 = NULL, *FM_1 = NULL, *S_VECTOR = NULL;
-  X_VECTOR = malloc(sizeof(p128bit) * M);
-  Y_VECTOR = malloc(sizeof(p128bit) * M);
-  M_VECTOR = malloc(sizeof(p128bit) * M);
-  V_AUX2 = malloc(sizeof(p128bit) * M);
-  FM_0 = malloc(sizeof(p128bit) * M * M);
-  FM_1 = malloc(sizeof(p128bit) * M * M);
-  S_VECTOR = malloc(sizeof(p128bit) * M);
-  p128bit m_sum, w, flux0, flux;
+  p32bit *IN = NULL, *OUT = NULL; 
+  p32bit *RESP_MATRIX = NULL, *PART_VECTOR = NULL, *V_AUX = NULL;
+  IN = malloc(sizeof(p32bit) * 4 * M);
+  OUT = malloc(sizeof(p32bit) * 4 * M);
+  RESP_MATRIX = malloc(sizeof(p32bit) * 16 * M * M);
+  PART_VECTOR = malloc(sizeof(p32bit) * 4 * M);
+  V_AUX = malloc(sizeof(p32bit) * 4 * M);
+  p32bit *X_VECTOR = NULL, *Y_VECTOR = NULL, *M_VECTOR = NULL, *V_AUX2 = NULL;
+  p32bit *FM_0 = NULL, *FM_1 = NULL, *S_VECTOR = NULL;
+  X_VECTOR = malloc(sizeof(p32bit) * M);
+  Y_VECTOR = malloc(sizeof(p32bit) * M);
+  M_VECTOR = malloc(sizeof(p32bit) * M);
+  V_AUX2 = malloc(sizeof(p32bit) * M);
+  FM_0 = malloc(sizeof(p32bit) * M * M);
+  FM_1 = malloc(sizeof(p32bit) * M * M);
+  S_VECTOR = malloc(sizeof(p32bit) * M);
+  p32bit m_sum, w, flux0, flux;
   
   if (IN == NULL || OUT == NULL || RESP_MATRIX == NULL || PART_VECTOR == NULL || V_AUX == NULL || X_VECTOR == NULL || Y_VECTOR == NULL || M_VECTOR == NULL || V_AUX2 == NULL || FM_0 == NULL || FM_1 == NULL || S_VECTOR == NULL){
     if (IN != NULL) free(IN); if (OUT != NULL) free(OUT); if (RESP_MATRIX != NULL) free(RESP_MATRIX);
@@ -3124,8 +3014,6 @@ int rm_lln (int N,               // Quadrature order
   }
 
   // ITERATIVE PROCESS
-  printf("\n3. ITERATIVE PROCESS:\n\n");
-	printf("ITER\tMAX_ERR (MFLUX)\n");
   start = clock(); *ITER = -1;
   while (ERR > tol && *ITER < 10000){
     ERR = 0.0; *ITER = *ITER + 1;
@@ -3549,11 +3437,9 @@ int rm_lln (int N,               // Quadrature order
       }
     }
 
-    printf("%d\t%.5Le\n", *ITER, ERR);
   }
   end = clock();
-  *cpu_time = (p128bit)(end - start) / CLOCKS_PER_SEC;
-  printf("CPU TIME = %.5Le\n\n", *cpu_time);
+  *cpu_time = (p32bit)(end - start) / CLOCKS_PER_SEC;
 
   // FREE MEMORY
   if (IN != NULL) free(IN); if (OUT != NULL) free(OUT); if (RESP_MATRIX != NULL) free(RESP_MATRIX);
@@ -3572,253 +3458,18 @@ int rm_lln (int N,               // Quadrature order
 
 ///////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////// AUXILIARY FUNCTIONS
-void print_problem(int N,           // Quadrature order
-                   int nz,          // Number of zones
-                   p128bit ZON[],    // Zone entries
-                   int nxr,         // Number of regions in X
-                   p128bit XDOM[],      // X Region entries
-                   int nyr,         // Number of regions in Y
-                   p128bit YDOM[],      // Y Region entries
-                   int ZMAP[],      // Zone map
-                   p128bit QMAP[],   // External source map
-                   p128bit BC[],     // Boundary conditions
-                   p128bit tol      // Tolerance
-                  ){
-
-  printf("\n1. PROBLEM SETUP:\n\n");
-
-  // QUADRATURE ORDER
-  printf("N = %d\n\n", N);
-
-  // NUMBER OF ZONES
-  printf("NZ = %d\n\n", nz);
-
-  // ZONE ENTRIES
-	printf("ZON:\n");
-  printf("NO.\tS_T\tS_S\n");
-  for (int z = 0; z < nz; z++){
-      printf("%d\t%.4Lf\t%.4Lf\n", z+1, ZON[z*2], ZON[z*2 + 1]);
-  }
-  printf("\n");
-
-  // NUMBER OF REGIONS IN X
-  printf("NR_X = %d\n\n", nxr);
-
-  // REGION ENTRIES IN X
-	printf("XDOM:\n");
-  printf("No.\tLEN\tNODES\n");
-  for (int xr = 0; xr < nxr; xr++){
-      printf("%d\t%.2Lf\t%d\n", xr + 1, XDOM[xr * 2], (int)XDOM[xr * 2 + 1]);
-  }
-  printf("\n");
-
-  // NUMBER OF REGIONS IN Y
-  printf("NR_Y = %d\n\n", nyr);
-
-  // REGION ENTRIES IN Y
-	printf("YDOM:\n");
-  printf("NO.\tLEN\tNODES\n");
-  for (int yr = 0; yr < nyr; yr++){
-      printf("%d\t%.2Lf\t%d\n", yr + 1, YDOM[yr * 2], (int)YDOM[yr * 2 + 1]);
-  }
-  printf("\n");
-
-  // ZONE MAPPING
-  printf("ZMAP:\n");
-  for (int yr = 0; yr < nyr; yr++) {
-		for (int xr = 0; xr < nxr; xr++) {
-			printf("%d\t", ZMAP[yr * nxr + xr] + 1);
-		}
-		printf("\n");
-  }
-  printf("\n");
-
-  // EXTERNAL SOURCE MAPPING
-  printf("Q_MAP:\n");
-  for (int yr = 0; yr < nyr; yr++) {
-		for (int xr = 0; xr < nxr; xr++) {
-			printf("%.4Lf\t", QMAP[yr * nxr + xr]);
-		}
-		printf("\n");
-  }
-  printf("\n");
-
-  // BOUNDARY CONDITIONS
-	printf("BOUNDARY_CONDITIONS =\n");
-	for (int c = 0; c < 4; c++) {
-		printf("%d. ", c + 1);
-		if (BC[c] == 0.0) printf("Vacuum\n");
-		else if (BC[c] == -1.0) printf("Reflective\n");
-    else printf("Isotropic %.2f\n", BC[c]);
-	}
-	printf("\n");
-
-  // TOLERANCE
-	printf("TOL = %.4Le\n\n", tol);
-
-}
-
-
-void post_processing(int N,               // Quadrature order
-                     int nz,              // Number of zones
-                     p128bit ZON[],   // Zone entries
-                     int nxr,             // Number of regions in X
-                     p128bit XDOM[],  // X Region entries
-                     int nyr,             // Number of regions in Y
-                     p128bit YDOM[],  // Y Region entries
-                     int ZMAP[],          // Zone map
-                     p128bit QMAP[],  // External source map
-                     p128bit BC[],    // Boundary conditions
-                     p128bit MIU[],   // Ordinates in X
-                     p128bit THETA[], // Ordinates in Y
-                     p128bit W[],
-	                   p128bit MFLUX[], // Scalar flux in the nodes
-                     p128bit MFLOW[], // Angular flux in the nodes
-                     p128bit XFLOW[], // Angular flux at the y edges
-                     p128bit YFLOW[]  // Angular flux at the x edges
-					 ){
-	
-	// INICIALIZATION
-	int j_b = 0, i_b = 0, j_f, i_f, ntc_x = 0, ntc_y = 0;;
-	int nc_y, nc_x, z;
-	p128bit h_y, h_x, area_r, sa, miu, theta, w, len_y, len_x;
-	p128bit *MFLUX_R = NULL, *ABS_R = NULL, FUGA[4] = {0.0};
-	MFLUX_R = malloc(sizeof(p128bit)*nyr*nxr); assert(MFLUX_R != NULL);
-	ABS_R = malloc(sizeof(p128bit)*nyr*nxr); assert(ABS_R != NULL);
-	for (int ry = 0; ry < nyr; ry++) {
-		for (int rx = 0; rx < nxr; rx++) {
-			MFLUX_R[nxr*ry + rx] = 0.0;
-			ABS_R[nxr*ry + rx] = 0.0;
-		}
-	}
-  for (int rx = 0; rx < nxr; rx++) {
-		ntc_x = ntc_x + (int)XDOM[2*rx + 1];
-	}
-	for (int ry = 0; ry < nyr; ry++) {
-		ntc_y = ntc_y + (int)YDOM[2 * ry + 1];
-	}
-  int M = N * (N + 2) / 2;
-
-	// CALCULATION OF MFLUX and ABS_R
-  j_b = 0;
-	for(int ry = 0; ry < nyr; ry++){
-		len_y = YDOM[2*ry]; nc_y = (int)YDOM[2*ry + 1]; h_y = (p128bit)len_y/nc_y;
-		for(int j = 0; j < nc_y; j++){
-			i_b = 0;
-			for(int rx = 0; rx < nxr; rx++){
-				len_x = XDOM[2*rx]; nc_x = (int)XDOM[2*rx + 1]; h_x = (p128bit)len_x/nc_x; 
-				area_r = len_y*len_x; z = ZMAP[nxr*ry + rx];
-				sa = ZON[2*z] - ZON[2*z + 1];
-				for(int i = 0; i < nc_x; i++){
-					MFLUX_R[nxr*ry + rx] = MFLUX_R[nxr*ry + rx] + h_y*h_x*MFLUX[ntc_x*j_b + i_b]/area_r;
-					ABS_R[nxr*ry + rx] = ABS_R[nxr*ry + rx] + sa*h_y*h_x*MFLUX[ntc_x*j_b + i_b];
-					i_b = i_b + 1;
-				}
-			}
-			j_b = j_b + 1;
-		}
-	}
-
-	// CALCULATION OF THE LEAKAGE FROM THE LEFT AND THE RIGHT BOUNDARIES
-	j_b = 0;
-	for(int ry = 0; ry < nyr; ry++){
-		len_y = YDOM[2*ry]; nc_y = (int)YDOM[2*ry + 1]; h_y = (p128bit)len_y/nc_y;
-		for(int j = 0; j < nc_y; j++){
-			// LEFT
-			for (int m = M/4; m < 3*M/4; m++){
-				miu = MIU[m]; w = W[m];	                          
-				FUGA[0] = FUGA[0] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + 0) + m];
-			}
-			// RIGHT
-			for (int m = 0; m < M/4; m++){
-				miu = MIU[m]; w = W[m];		                          
-				FUGA[2] = FUGA[2] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + m];
-			}
-			for (int m = 3*M/4; m < M; m++){
-				miu = MIU[m]; w = W[m];		                          
-				FUGA[2] = FUGA[2] + 0.5*h_y*w*miu*XFLOW[M * ((ntc_x + 1) * j_b + ntc_x) + m];
-			}                         
-			j_b = j_b + 1;
-		}
-	}
-
-	// CALCULATION OF THE LEAKAGE FROM THE BOTTOM AND THE TOP BOUNDARIES
-	i_b = 0;
-	for(int rx = 0; rx < nxr; rx++){
-		len_x = XDOM[2*rx]; nc_x = (int)XDOM[2*rx + 1]; h_x = (p128bit)len_x/nc_x;
-		for(int i = 0; i < nc_x; i++){
-			for (int m = M/2; m < M; m++){
-				theta = THETA[m]; w = W[m];   	
-				FUGA[1] = FUGA[1] + 0.5*h_x*w*theta*YFLOW[M * (ntc_x * 0 + i_b) + m];
-			}
-			for (int m = 0; m < M/2; m++){
-				theta = THETA[m]; w = W[m];
-				FUGA[3] = FUGA[3] + 0.5*h_x*w*theta*YFLOW[M * (ntc_x * ntc_y + i_b) + m];
-			}
-			i_b = i_b + 1;
-		}
-	}
-
-	// PRINT POST PROCESSING
-	printf("\n\n4. POST - PROCESSING:\n\n");
-
-	// SCALAR FLUX PER REGION
-	printf("SCALAR FLUX PER REGION =\n");
-	for (int rx = 0; rx < nxr; rx++) {
-		printf("\tRX_%d\t", rx + 1);
-	}
-	printf("\n");
-	for (int ry = 0; ry < nyr; ry++) {
-		printf("RY_%d\t", ry + 1);
-		for (int rx = 0; rx < nxr; rx++) {
-			printf("% .5Le\t", MFLUX_R[nxr * ry + rx]);
-		}
-		printf("\n");
-	}
-	printf("\n");
-
-	// ABSORPTION RATE PER REGION
-	printf("ABSORPTION RATE PER REGION =\n");
-	for (int rx = 0; rx < nxr; rx++) {
-		printf("\tRX_%d\t", rx + 1);
-	}
-	printf("\n");
-	for (int ry = 0; ry < nyr; ry++) {
-		printf("RY_%d\t", ry + 1);
-		for (int rx = 0; rx < nxr; rx++) {
-			printf("% .5Le\t", ABS_R[nxr * ry + rx]);
-		}
-		printf("\n");
-	}
-	printf("\n");
-
-	// LEAKAGE
-  printf("LEAKAGE =\n");
-	printf("LEFT\t\tBOTTOM\t\tRIGHT\t\tTOP\n");
-  for(int i = 0; i < 4; i++){
-    if (BC[i] == -1.0) printf("-\t\t");
-		else printf("%.4Le\t", FUGA[i]);
-	}
-	printf("\n\n");
-	
-	free(MFLUX_R); free(ABS_R);
-
-}
-
-
 void json_output(int N,               // Quadrature order
                  int nxr,             // Number of regions in X
-                 p128bit XDOM[],  // X Region entries
+                 p32bit XDOM[],  // X Region entries
                  int nyr,             // Number of regions in Y
-                 p128bit YDOM[],  // Y Region entries
+                 p32bit YDOM[],  // Y Region entries
                  int status,          // Status
                  int ITER,            // Iterations
-                 p128bit cpu_time,// CPU time
-	               p128bit MFLUX[], // Scalar flux in the nodes
-                 p128bit MFLOW[], // Angular flux in the nodes
-                 p128bit XFLOW[], // Angular flux at the y edges
-                 p128bit YFLOW[]  // Angular flux at the x edges
+                 p32bit cpu_time,// CPU time
+	               p32bit MFLUX[], // Scalar flux in the nodes
+                 p32bit MFLOW[], // Angular flux in the nodes
+                 p32bit XFLOW[], // Angular flux at the y edges
+                 p32bit YFLOW[]  // Angular flux at the x edges
 					 ){
 	
 	// INICIALIZATION
@@ -3842,7 +3493,7 @@ void json_output(int N,               // Quadrature order
     printf(",\n\"ITER\": %d,\n", ITER);
 
     // CPU TIME
-    printf("\"CPU\": %.10Le,\n", cpu_time);
+    printf("\"CPU\": %.10e,\n", cpu_time);
 
     // MFLUX
     printf("\"MFLUX\": [\n");
@@ -3856,10 +3507,10 @@ void json_output(int N,               // Quadrature order
           nc_x = (int)XDOM[2*rx + 1];
           for(int i = 0; i < nc_x; i++){
             if (i_b == ntc_x - 1) {
-              if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLUX[ntc_x*j_b + i_b]);
-              else printf(" %.10Le ],\n", MFLUX[ntc_x*j_b + i_b]);
+              if (j_b == ntc_y - 1) printf(" %.10e ]\n", MFLUX[ntc_x*j_b + i_b]);
+              else printf(" %.10e ],\n", MFLUX[ntc_x*j_b + i_b]);
             }
-            else printf(" %.10Le,", MFLUX[ntc_x*j_b + i_b]);
+            else printf(" %.10e,", MFLUX[ntc_x*j_b + i_b]);
             i_b = i_b + 1;
           }
         }
@@ -3881,13 +3532,13 @@ void json_output(int N,               // Quadrature order
           for(int rx = 0; rx < nxr; rx++){
             nc_x = (int)XDOM[2*rx + 1];
             for(int i = 0; i < nc_x; i++){
-              printf(" %.10Le,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+              printf(" %.10e,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
               i_b = i_b + 1;
             }
           }
           if (i_b == ntc_x) {
-            if (j_b == ntc_y - 1) printf(" %.10Le ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
-            else printf(" %.10Le ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+            if (j_b == ntc_y - 1) printf(" %.10e ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+            else printf(" %.10e ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
           }
           j_b = j_b + 1;
         }
@@ -3910,8 +3561,8 @@ void json_output(int N,               // Quadrature order
           for(int rx = 0; rx < nxr; rx++){
             nc_x = (int)XDOM[2*rx + 1];
             for(int i = 0; i < nc_x; i++){
-              if (i_b == ntc_x - 1) printf(" %.10Le ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-              else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+              if (i_b == ntc_x - 1) printf(" %.10e ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+              else printf(" %.10e,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
               i_b = i_b + 1;
             }
           }
@@ -3924,8 +3575,8 @@ void json_output(int N,               // Quadrature order
         for(int rx = 0; rx < nxr; rx++){
           nc_x = (int)XDOM[2*rx + 1];
           for(int i = 0; i < nc_x; i++){
-            if (i_b == ntc_x - 1) printf(" %.10Le ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-            else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+            if (i_b == ntc_x - 1) printf(" %.10e ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+            else printf(" %.10e,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
             i_b = i_b + 1;
           }
         }

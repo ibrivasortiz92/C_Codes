@@ -621,13 +621,13 @@ int dd (int N,               // Quadrature order
 	}
 
   // VARIABLES
-  clock_t start, end;
+  clock_t start_t, end_t;
   long double ERR = 1.0;
 
   // ITERATIVE PROCESS
   printf("\n3. ITERATIVE PROCESS:\n\n");
 	printf("ITER\tMAX_ERR (MFLUX)\n");
-  start = clock(); *ITER = -1;
+  start_t = clock(); *ITER = -1;
   while (ERR > tol && *ITER < 10000){
     ERR = 0.0; *ITER = *ITER + 1;
 
@@ -834,8 +834,9 @@ int dd (int N,               // Quadrature order
 
     printf("%d\t%.5Le\n", *ITER, ERR);
   }
-  end = clock();
-  *cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
+  end_t = clock();
+  printf("END %f\n", (double)clock()/10000000);
+  *cpu_time = (long double)(end_t - start_t) / CLOCKS_PER_SEC;
   printf("CPU TIME = %.5Le\n\n", *cpu_time);
 
   if (S != NULL) free(S);
