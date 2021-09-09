@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <crtdbg.h>
+#include <unistd.h>
 #define printf __mingw_printf
 #define eps 1e-18
 
@@ -631,6 +632,7 @@ int step (int N,               // Quadrature order
   printf("\n3. ITERATIVE PROCESS:\n\n");
 	printf("ITER\tMAX_ERR (MFLUX)\n");
   start = clock(); *ITER = -1;
+  sleep(1);
   while (ERR > tol && *ITER < 10000){
     ERR = 0.0; *ITER = *ITER + 1;
 
@@ -838,7 +840,7 @@ int step (int N,               // Quadrature order
     printf("%d\t%.5Le\n", *ITER, ERR);
   }
   end = clock();
-  *cpu_time = (long double)(end - start) / CLOCKS_PER_SEC;
+  *cpu_time = (long double)(end - start) / CLOCKS_PER_SEC - 1.0;
   printf("CPU TIME = %.5Le\n\n", *cpu_time);
 
   if (S != NULL) free(S);

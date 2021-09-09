@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
-#include <sys/time.h>
+#include <unistd.h>
 #define printf __mingw_printf
 #define eps 1e-18
 
@@ -608,6 +608,7 @@ int dd (int N,               // Quadrature order
 
   // ITERATIVE PROCESS
   start_t = clock(); *ITER = -1;
+  sleep(1);
   while (ERR > tol && *ITER < 10000){
     ERR = 0.0; *ITER = *ITER + 1;
 
@@ -814,7 +815,7 @@ int dd (int N,               // Quadrature order
 
   }
   end_t = clock();
-  *cpu_time = (long double)(end_t - start_t) / CLOCKS_PER_SEC;
+  *cpu_time = (long double)(end_t - start_t) / CLOCKS_PER_SEC - 1.0;
 
   if (S != NULL) free(S);
 
