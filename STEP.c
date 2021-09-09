@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <sys/time.h>
 #include <assert.h>
+#include <crtdbg.h>
 #define printf __mingw_printf
-#define eps 1e-12
+#define eps 1e-18
 
 //////////////////////////////////////////////////////////////////////////////////// PROTOTYPES
 
@@ -122,6 +124,7 @@ int main(int argc, char *argv[]){
               &MIU, &THETA, &FI, &W, &LIST,
               &MFLUX, &MFLOW, &XFLOW, &YFLOW);
 
+  _CrtDumpMemoryLeaks();
   return 0;
 
 }

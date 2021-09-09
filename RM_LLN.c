@@ -3831,71 +3831,50 @@ void json_output(int N,               // Quadrature order
 	}
   int M = N * (N + 2) / 2;
 
-  // STATUS
-  printf("{\n\"STATUS\": %d", status);
-
-  if (status != 0) printf("\n}\n");
+  if (status != 0) {
+    printf("{\n\"STATUS\": %d\n}\n", status);
+  }
   else {
 
     // MFLUX VERIFICATION
-    printf("\"MFLUX\": [\n");
     j_b = 0;
     for(int ry = 0; ry < nyr; ry++){
       nc_y = (int)YDOM[2*ry + 1];
       for(int j = 0; j < nc_y; j++){
         i_b = 0;
-        printf("[");
         for(int rx = 0; rx < nxr; rx++){
           nc_x = (int)XDOM[2*rx + 1];
           for(int i = 0; i < nc_x; i++){
-            if (i_b == ntc_x - 1) {
-              if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLUX[ntc_x*j_b + i_b]);
-              else printf(" %.10Le ],\n", MFLUX[ntc_x*j_b + i_b]);
+            if (isfinite(MFLUX[ntc_x*j_b + i_b]) == 0){
+              status = 6;
+              break;
             }
-            else printf(" %.10Le,", MFLUX[ntc_x*j_b + i_b]);
-            i_b = i_b + 1;
           }
+          if (status != 0) break;
         }
+        if (status != 0) break;
         j_b = j_b + 1;
       }
+      if (status != 0) break;
     }
-    printf("],\n");
 
-    // ITERATIONS
-    printf(",\n\"ITER\": %d,\n", ITER);
-
-    // CPU TIME
-    printf("\"CPU\": %.10Le,\n", cpu_time);
-
-    // MFLUX
-    printf("\"MFLUX\": [\n");
-    j_b = 0;
-    for(int ry = 0; ry < nyr; ry++){
-      nc_y = (int)YDOM[2*ry + 1];
-      for(int j = 0; j < nc_y; j++){
-        i_b = 0;
-        printf("[");
-        for(int rx = 0; rx < nxr; rx++){
-          nc_x = (int)XDOM[2*rx + 1];
-          for(int i = 0; i < nc_x; i++){
-            if (i_b == ntc_x - 1) {
-              if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLUX[ntc_x*j_b + i_b]);
-              else printf(" %.10Le ],\n", MFLUX[ntc_x*j_b + i_b]);
-            }
-            else printf(" %.10Le,", MFLUX[ntc_x*j_b + i_b]);
-            i_b = i_b + 1;
-          }
-        }
-        j_b = j_b + 1;
-      }
+    // STATUS
+    if (status != 0) {
+      printf("{\n\"STATUS\": %d\n}\n", status);
     }
-    printf("],\n");
+    else {
 
-    // XFLOW
-    printf("\"XFLOW\": [\n");
-    for (int m = 0; m < M; m++){
+      printf("{\n\"STATUS\": %d", status);
+
+      // ITERATIONS
+      printf(",\n\"ITER\": %d,\n", ITER);
+
+      // CPU TIME
+      printf("\"CPU\": %.10Le,\n", cpu_time);
+
+      // MFLUX
+      printf("\"MFLUX\": [\n");
       j_b = 0;
-      printf("[\n");
       for(int ry = 0; ry < nyr; ry++){
         nc_y = (int)YDOM[2*ry + 1];
         for(int j = 0; j < nc_y; j++){
@@ -3904,61 +3883,88 @@ void json_output(int N,               // Quadrature order
           for(int rx = 0; rx < nxr; rx++){
             nc_x = (int)XDOM[2*rx + 1];
             for(int i = 0; i < nc_x; i++){
-              printf(" %.10Le,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+              if (i_b == ntc_x - 1) {
+                if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLUX[ntc_x*j_b + i_b]);
+                else printf(" %.10Le ],\n", MFLUX[ntc_x*j_b + i_b]);
+              }
+              else printf(" %.10Le,", MFLUX[ntc_x*j_b + i_b]);
               i_b = i_b + 1;
             }
-          }
-          if (i_b == ntc_x) {
-            if (j_b == ntc_y - 1) printf(" %.10Le ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
-            else printf(" %.10Le ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
           }
           j_b = j_b + 1;
         }
       }
-      if (m == M-1) printf("]\n");
-      else printf("],\n");
-    }
-    printf("],\n");
+      printf("],\n");
 
-    // YFLOW
-    printf("\"YFLOW\": [\n");
-    for (int m = 0; m < M; m++){
-      j_b = 0;
-      printf("[\n");
-      for(int ry = 0; ry < nyr; ry++){
-        nc_y = (int)YDOM[2*ry + 1];
-        for(int j = 0; j < nc_y; j++){
+      // XFLOW
+      printf("\"XFLOW\": [\n");
+      for (int m = 0; m < M; m++){
+        j_b = 0;
+        printf("[\n");
+        for(int ry = 0; ry < nyr; ry++){
+          nc_y = (int)YDOM[2*ry + 1];
+          for(int j = 0; j < nc_y; j++){
+            i_b = 0;
+            printf("[");
+            for(int rx = 0; rx < nxr; rx++){
+              nc_x = (int)XDOM[2*rx + 1];
+              for(int i = 0; i < nc_x; i++){
+                printf(" %.10Le,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+                i_b = i_b + 1;
+              }
+            }
+            if (i_b == ntc_x) {
+              if (j_b == ntc_y - 1) printf(" %.10Le ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+              else printf(" %.10Le ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+            }
+            j_b = j_b + 1;
+          }
+        }
+        if (m == M-1) printf("]\n");
+        else printf("],\n");
+      }
+      printf("],\n");
+
+      // YFLOW
+      printf("\"YFLOW\": [\n");
+      for (int m = 0; m < M; m++){
+        j_b = 0;
+        printf("[\n");
+        for(int ry = 0; ry < nyr; ry++){
+          nc_y = (int)YDOM[2*ry + 1];
+          for(int j = 0; j < nc_y; j++){
+            i_b = 0;
+            printf("[");
+            for(int rx = 0; rx < nxr; rx++){
+              nc_x = (int)XDOM[2*rx + 1];
+              for(int i = 0; i < nc_x; i++){
+                if (i_b == ntc_x - 1) printf(" %.10Le ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+                else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+                i_b = i_b + 1;
+              }
+            }
+            j_b = j_b + 1;
+          }
+        }
+        if (j_b == ntc_y){
           i_b = 0;
           printf("[");
           for(int rx = 0; rx < nxr; rx++){
             nc_x = (int)XDOM[2*rx + 1];
             for(int i = 0; i < nc_x; i++){
-              if (i_b == ntc_x - 1) printf(" %.10Le ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+              if (i_b == ntc_x - 1) printf(" %.10Le ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
               else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
               i_b = i_b + 1;
             }
           }
-          j_b = j_b + 1;
         }
+        if (m == M-1) printf("]\n");
+        else printf("],\n");
       }
-      if (j_b == ntc_y){
-        i_b = 0;
-        printf("[");
-        for(int rx = 0; rx < nxr; rx++){
-          nc_x = (int)XDOM[2*rx + 1];
-          for(int i = 0; i < nc_x; i++){
-            if (i_b == ntc_x - 1) printf(" %.10Le ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-            else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-            i_b = i_b + 1;
-          }
-        }
-      }
-      if (m == M-1) printf("]\n");
-      else printf("],\n");
-    }
-    printf("]\n");
+      printf("]\n");
 
-    printf("}\n");
+      printf("}\n");
+    }
   }
 
 }
