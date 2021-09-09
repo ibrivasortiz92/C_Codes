@@ -14,7 +14,7 @@
 void free_memory(long double **ZON, long double **XDOM, long double **YDOM, int **ZMAP, long double **QMAP, long double **MIU, long double **THETA, long double **FI, long double **W, long double **LIST, long double **XVALS, long double **XVECTS, long double **YVALS, long double **YVECTS, long double **RM, long double **PV, long double **FM0, long double **FM1, long double **SM, long double **MFLUX, long double **MFLOW, long double **XFLOW, long double **YFLOW);
 
 //////////////////////////////////////////////////////// LOAD PROBLEM FROM FILE
-int input_by_txt(int *N, int *nz, long double **ZON, int *nxr, long double **XDOM, int *nyr, long double **YDOM, int **ZMAP, long double **QMAP, long double *BC, long double *tol, const char *filename);
+int input_by_txt(int *N, int *nz, long double **ZON, int *nxr, long double **XDOM, int *nyr, long double **YDOM, int **ZMAP, long double **QMAP, long double *BC, long double *tol, int *scale, const char *filename);
 
 /////////////////////////////////////////////////////////// GENERATE QUADRATURE
 int quad(int N, long double **MIU, long double **THETA, long double **CHI, long double **W, long double **LIST);
@@ -82,7 +82,7 @@ void print_problem(int N, int nz, long double ZON[], int nxr, long double XDOM[]
 
 void post_processing(int N, int nz, long double ZON[], int nxr, long double XDOM[], int nyr, long double YDOM[], int ZMAP[], long double QMAP[], long double BC[], long double MIU[], long double THETA[], long double W[], long double MFLUX[], long double MFLOW[], long double XFLOW[], long double YFLOW[]);
 
-void json_output(int N, int nxr, long double XDOM[], int nyr, long double YDOM[], int status, int ITER, long double cpu_time, long double MFLUX[], long double MFLOW[], long double XFLOW[], long double YFLOW[]);
+void json_output(int N, int nxr, long double XDOM[], int nyr, long double YDOM[], int scale, int status, int ITER, long double cpu_time, long double MFLUX[], long double MFLOW[], long double XFLOW[], long double YFLOW[]);
                   
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -105,6 +105,7 @@ int main(int argc, char *argv[]){
   long double BC[4] = {0.0};   // Boundary conditions
   long double tol = 0.0;       // Tolerance
   const char *filename = NULL; // File name to load
+  int scale = 1;               // Scale
 
   // QUADRATURE VARIABLES
   long double *MIU = NULL;   // Ordinates in X
@@ -137,15 +138,15 @@ int main(int argc, char *argv[]){
   if (argc != 2){
     // Usage: ./RM_CN <input>
     status = 1;
-    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    json_output(N, nxr, XDOM, nyr, YDOM, scale, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
     return 0;
   }
 
   // LOAD PROBLEM
   filename = argv[1];
-  status = input_by_txt(&N, &nz, &ZON, &nxr, &XDOM, &nyr, &YDOM, &ZMAP, &QMAP, BC, &tol, filename);
+  status = input_by_txt(&N, &nz, &ZON, &nxr, &XDOM, &nyr, &YDOM, &ZMAP, &QMAP, BC, &tol, &scale, filename);
   if (status != 0) {
-    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    json_output(N, nxr, XDOM, nyr, YDOM, scale, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
     return 0;
   }
   
@@ -156,7 +157,7 @@ int main(int argc, char *argv[]){
   int M = N * (N + 2) / 2;
   status = quad(N, &MIU, &THETA, &FI, &W, &LIST);
   if (status != 0){
-    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    json_output(N, nxr, XDOM, nyr, YDOM, scale, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
     free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
                 &MIU, &THETA, &FI, &W, &LIST,
                 &XVALS, &XVECTS, &YVALS, &YVECTS,
@@ -176,7 +177,7 @@ int main(int argc, char *argv[]){
   // GENERATE SPECTRUM
   status = spectrum(N, MIU, THETA, LIST, W, nz, ZON, &XVALS, &XVECTS, &YVALS, &YVECTS);
   if (status != 0){
-    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    json_output(N, nxr, XDOM, nyr, YDOM, scale, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
     free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
                 &MIU, &THETA, &FI, &W, &LIST,
                 &XVALS, &XVECTS, &YVALS, &YVECTS,
@@ -191,7 +192,7 @@ int main(int argc, char *argv[]){
   // GENERATE RESPONSE MATRIX
   status = response_matrix(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, MIU, THETA, W, XVALS, XVECTS, YVALS, YVECTS, &RM, &PV, &FM0, &FM1, &SM);
   if (status != 0){
-    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    json_output(N, nxr, XDOM, nyr, YDOM, scale, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
     free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
                 &MIU, &THETA, &FI, &W, &LIST,
                 &XVALS, &XVECTS, &YVALS, &YVECTS,
@@ -215,7 +216,7 @@ int main(int argc, char *argv[]){
   // ITERATIVE SCHEME
   status = rm_lln (N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, tol, W, RM, PV, FM0, FM1, SM, &MFLUX, &MFLOW, &XFLOW, &YFLOW, &ITER, &cpu_time);
   if (status != 0){
-    json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+    json_output(N, nxr, XDOM, nyr, YDOM, scale, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
     free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
                 &MIU, &THETA, &FI, &W, &LIST,
                 &XVALS, &XVECTS, &YVALS, &YVECTS,
@@ -228,7 +229,7 @@ int main(int argc, char *argv[]){
   post_processing(N, nz, ZON, nxr, XDOM, nyr, YDOM, ZMAP, QMAP, BC, MIU, THETA, W, MFLUX, MFLOW, XFLOW, YFLOW);
 
   // JSON OUTPUTS
-  json_output(N, nxr, XDOM, nyr, YDOM, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
+  json_output(N, nxr, XDOM, nyr, YDOM, scale, status, ITER, cpu_time, MFLUX, MFLOW, XFLOW, YFLOW);
 
   // FREE MEMORY
   free_memory(&ZON, &XDOM, &YDOM, &ZMAP, &QMAP,
@@ -284,6 +285,7 @@ int input_by_txt(int *N,                  // Quadrature order
                 long double **QMAP,       // External source map
                 long double *BC,          // Boundary conditions
                 long double *tol,         // Tolerance
+                int *scale,               // Scale
                 const char *filename      // File name to load
                 ){
 
@@ -361,6 +363,7 @@ int input_by_txt(int *N,                  // Quadrature order
       free(*ZON); free(*XDOM);
       return 2;
     }
+    if (*scale < nodes) *scale = (int)nodes;
     (*XDOM)[xr * 2] = (long double)len; (*XDOM)[xr * 2 + 1] = (long double)nodes;
     rx_count = rx_count + 1;
   }
@@ -396,6 +399,7 @@ int input_by_txt(int *N,                  // Quadrature order
       free(*ZON); free(*XDOM); free(*YDOM);
       return 2;
     }
+    if (*scale < nodes) *scale = (int)nodes;
     (*YDOM)[yr * 2] = (long double)len; (*YDOM)[yr * 2 + 1] = (long double)nodes;
     ry_count = ry_count + 1;
   }
@@ -505,6 +509,14 @@ int input_by_txt(int *N,                  // Quadrature order
   *tol = (long double)dtol;
 
 	fclose(cfPtr);
+
+  // RESCALE
+  for (int ry = 0; ry < *nyr; ry++){
+      (*YDOM)[ry * 2] = (*scale) * (*YDOM[ry * 2]);
+  }
+  for (int rx = 0; rx < *nxr; rx++){
+      (*XDOM)[rx * 2] = (*scale) * (*XDOM[rx * 2]);
+  }
 
   return 0;
 }
@@ -3811,6 +3823,7 @@ void json_output(int N,               // Quadrature order
                  long double XDOM[],  // X Region entries
                  int nyr,             // Number of regions in Y
                  long double YDOM[],  // Y Region entries
+                 int scale,           // scale
                  int status,          // Status
                  int ITER,            // Iterations
                  long double cpu_time,// CPU time
@@ -3855,10 +3868,10 @@ void json_output(int N,               // Quadrature order
           nc_x = (int)XDOM[2*rx + 1];
           for(int i = 0; i < nc_x; i++){
             if (i_b == ntc_x - 1) {
-              if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLUX[ntc_x*j_b + i_b]);
-              else printf(" %.10Le ],\n", MFLUX[ntc_x*j_b + i_b]);
+              if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLUX[ntc_x*j_b + i_b] / scale);
+              else printf(" %.10Le ],\n", MFLUX[ntc_x*j_b + i_b] / scale);
             }
-            else printf(" %.10Le,", MFLUX[ntc_x*j_b + i_b]);
+            else printf(" %.10Le,", MFLUX[ntc_x*j_b + i_b] / scale);
             i_b = i_b + 1;
           }
         }
@@ -3880,13 +3893,13 @@ void json_output(int N,               // Quadrature order
           for(int rx = 0; rx < nxr; rx++){
             nc_x = (int)XDOM[2*rx + 1];
             for(int i = 0; i < nc_x; i++){
-              printf(" %.10Le,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+              printf(" %.10Le,", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m] / scale);
               i_b = i_b + 1;
             }
           }
           if (i_b == ntc_x) {
-            if (j_b == ntc_y - 1) printf(" %.10Le ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
-            else printf(" %.10Le ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m]);
+            if (j_b == ntc_y - 1) printf(" %.10Le ]\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m] / scale);
+            else printf(" %.10Le ],\n", XFLOW[M * ((ntc_x + 1) * j_b + i_b) + m] / scale);
           }
           j_b = j_b + 1;
         }
@@ -3909,8 +3922,8 @@ void json_output(int N,               // Quadrature order
           for(int rx = 0; rx < nxr; rx++){
             nc_x = (int)XDOM[2*rx + 1];
             for(int i = 0; i < nc_x; i++){
-              if (i_b == ntc_x - 1) printf(" %.10Le ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-              else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+              if (i_b == ntc_x - 1) printf(" %.10Le ],\n", YFLOW[M * (ntc_x * j_b + i_b) + m] / scale);
+              else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m] / scale);
               i_b = i_b + 1;
             }
           }
@@ -3923,8 +3936,8 @@ void json_output(int N,               // Quadrature order
         for(int rx = 0; rx < nxr; rx++){
           nc_x = (int)XDOM[2*rx + 1];
           for(int i = 0; i < nc_x; i++){
-            if (i_b == ntc_x - 1) printf(" %.10Le ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m]);
-            else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m]);
+            if (i_b == ntc_x - 1) printf(" %.10Le ]\n", YFLOW[M * (ntc_x * j_b + i_b) + m] / scale);
+            else printf(" %.10Le,", YFLOW[M * (ntc_x * j_b + i_b) + m] / scale);
             i_b = i_b + 1;
           }
         }

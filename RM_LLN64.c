@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <crtdbg.h>
 #define printf __mingw_printf
-#define eps 1e-8
+#define eps 1e-15
 #define p64bit double
 
 
