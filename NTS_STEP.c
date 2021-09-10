@@ -917,6 +917,35 @@ void json_output(int N,               // Quadrature order
       }
       printf("],\n");
 
+	  // MFLOW
+    printf("\"MFLOW\": [\n");
+    for (int m = 0; m < M; m++){
+      j_b = 0;
+      printf("[\n");
+      for(int ry = 0; ry < nyr; ry++){
+        nc_y = (int)YDOM[2*ry + 1];
+        for(int j = 0; j < nc_y; j++){
+          i_b = 0;
+          printf("[");
+          for(int rx = 0; rx < nxr; rx++){
+            nc_x = (int)XDOM[2*rx + 1];
+            for(int i = 0; i < nc_x; i++){
+				if (i_b == ntc_x - 1){
+					if (j_b == ntc_y - 1) printf(" %.10Le ]\n", MFLOW[M * (ntc_x * j_b + i_b) + m]);
+					else printf(" %.10Le ],\n", MFLOW[M * (ntc_x * j_b + i_b) + m]);
+				}
+				else printf(" %.10Le,", MFLOW[M * (ntc_x * j_b + i_b) + m]);
+                i_b = i_b + 1;
+            }
+          }
+          j_b = j_b + 1;
+        }
+      }
+      if (m == M-1) printf("]\n");
+      else printf("],\n");
+    }
+    printf("],\n");
+
       // XFLOW
       printf("\"XFLOW\": [\n");
       for (int m = 0; m < M; m++){
